@@ -420,13 +420,15 @@
 }
 
 .category-select {
-  appearance: none;
-  -webkit-appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 12px center;
-  background-size: 14px;
-  padding-right: 32px !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  background-color: var(--bg-input);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: calc(100% - 12px) center !important;
+  background-size: 14px 14px !important;
+  padding-right: 34px !important;
   cursor: pointer;
 }
 
@@ -594,6 +596,84 @@
 
 .hours-total-value.goal-reached {
   color: #34d399;
+}
+
+.hours-total-display {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 1.15rem;
+  color: var(--text-main);
+}
+
+.hours-logged-value strong {
+  font-size: 1.22rem;
+  font-weight: 700;
+}
+
+.hours-logged-value.goal-reached {
+  color: #34d399;
+}
+
+.hours-divider {
+  color: var(--text-dim);
+  font-weight: 600;
+  margin: 0 1px;
+}
+
+.target-hours-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1.5px dashed rgba(255, 255, 255, 0.22);
+  border-radius: var(--radius-sm);
+  padding: 2px 7px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.target-hours-control:hover,
+.target-hours-control:focus-within {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: #60a5fa;
+  border-style: solid;
+}
+
+.target-hours-input {
+  width: 38px;
+  padding: 1px 0;
+  border: none;
+  background: transparent;
+  color: var(--text-main);
+  font-family: var(--font-mono);
+  font-size: 1.05rem;
+  font-weight: 700;
+  text-align: center;
+  outline: none;
+}
+
+.target-hours-input::-webkit-inner-spin-button,
+.target-hours-input::-webkit-outer-spin-button {
+  opacity: 0.6;
+}
+
+.target-hours-unit {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.target-edit-hint {
+  color: var(--text-dim);
+  opacity: 0.6;
+  transition: opacity 0.2s ease;
+}
+
+.target-hours-control:hover .target-edit-hint {
+  color: #60a5fa;
+  opacity: 1;
 }
 
 .hours-badge {
@@ -5984,7 +6064,7 @@
 
 [data-theme="light"] .styled-input,
 [data-theme="light"] .styled-select {
-  background: #ffffff !important;
+  background-color: #ffffff !important;
   border-color: #cbd5e1 !important;
   color: #0f172a !important;
 }
@@ -6185,7 +6265,14 @@
 }
 
 [data-theme="light"] .category-select {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  background-color: #ffffff !important;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23475569' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: calc(100% - 12px) center !important;
+  background-size: 14px 14px !important;
 }
 
 /* Daily Total Hours Box (Submission Bar) - Light Theme */
@@ -6199,12 +6286,46 @@
   color: #334155 !important;
 }
 
-[data-theme="light"] .hours-total-value {
+[data-theme="light"] .hours-total-value,
+[data-theme="light"] .hours-total-display {
   color: #0f172a !important;
 }
 
+[data-theme="light"] .hours-logged-value.goal-reached,
 [data-theme="light"] .hours-total-value.goal-reached {
   color: #15803d !important;
+}
+
+[data-theme="light"] .hours-divider {
+  color: #94a3b8 !important;
+}
+
+[data-theme="light"] .target-hours-control {
+  background: #f1f5f9 !important;
+  border: 1.5px dashed #94a3b8 !important;
+}
+
+[data-theme="light"] .target-hours-control:hover,
+[data-theme="light"] .target-hours-control:focus-within {
+  background: #eff6ff !important;
+  border-color: #2563eb !important;
+  border-style: solid !important;
+}
+
+[data-theme="light"] .target-hours-input {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .target-hours-unit {
+  color: #475569 !important;
+}
+
+[data-theme="light"] .target-edit-hint {
+  color: #64748b !important;
+}
+
+[data-theme="light"] .target-hours-control:hover .target-edit-hint {
+  color: #2563eb !important;
 }
 
 [data-theme="light"] .hours-badge.badge-success {

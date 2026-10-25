@@ -13,7 +13,7 @@ import java.util.List;
 @Service
 public class ScheduleService {
 
-    private static final double TARGET_TOTAL_HOURS = 8.0;
+    private static final double TARGET_TOTAL_HOURS = 6.0;
 
     public DayScheduleResponse getScheduleForDate(LocalDate date, String userName) {
         if (date == null) {

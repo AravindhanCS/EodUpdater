@@ -12,7 +12,8 @@ import {
   CheckCircle2, 
   RotateCcw,
   Zap,
-  Info
+  Info,
+  Edit2
 } from 'lucide-react';
 import AdoTicketSelector from './AdoTicketSelector';
 import { fetchDaySchedule } from '../services/api';
@@ -42,14 +43,22 @@ export default function DailyTaskForm({
   const todayStr = new Date().toISOString().split('T')[0];
   const [selectedDate, setSelectedDate] = useState(todayStr);
 
+  const [targetDailyHours, setTargetDailyHours] = useState(() => {
+    const saved = localStorage.getItem('eod_target_daily_hours');
+    const parsed = parseFloat(saved);
+    return (!isNaN(parsed) && parsed > 0) ? parsed : 6.0;
+  });
+
+  const safeTarget = typeof targetDailyHours === 'number' && targetDailyHours > 0 ? targetDailyHours : 6.0;
+
   const [daySchedule, setDaySchedule] = useState({
     scheduledCalls: [
       { date: todayStr, name: currentUser, ticket: '', category: 'Internal calls', timeInHrs: 0.5, description: 'Internal standup' },
       { date: todayStr, name: currentUser, ticket: '', category: 'Client calls', timeInHrs: 1.0, description: 'Technical and standup calls' }
     ],
     totalScheduledHours: 1.5,
-    remainingDevHours: 6.5,
-    targetTotalHours: 8.0
+    remainingDevHours: 4.5,
+    targetTotalHours: 6.0
   });
 
   const [selectedTicketIds, setSelectedTicketIds] = useState([]);
@@ -66,14 +75,14 @@ export default function DailyTaskForm({
     try {
       const schedule = await fetchDaySchedule(date, user);
       setDaySchedule(schedule);
-      buildRows(schedule, selectedTickets);
+      buildRows(schedule, selectedTickets, safeTarget);
     } catch (e) {
       console.warn('Could not load day schedule:', e);
     }
   };
 
   // Build rows combining scheduled recurring calls + equally divided tickets
-  const buildRows = (schedule, tickets) => {
+  const buildRows = (schedule, tickets, currentTarget = safeTarget) => {
     const newRows = [];
 
     // 1. Add scheduled calls
@@ -90,8 +99,11 @@ export default function DailyTaskForm({
       });
     }
 
-    // 2. Add selected ADO tickets with 0.5h-rounded distributed hours
-    const devHours = schedule ? schedule.remainingDevHours : 6.5;
+    // 2. Add selected ADO tickets with 0.5h-rounded distributed hours based on target
+    const scheduledHours = schedule ? (schedule.totalScheduledHours || 1.5) : 1.5;
+    const target = typeof currentTarget === 'number' && currentTarget > 0 ? currentTarget : 6.0;
+    const devHours = Math.max(0.5, target - scheduledHours);
+
     if (tickets && tickets.length > 0) {
       const allocations = distributeHoursInHalfHours(devHours, tickets.length);
       tickets.forEach((t, index) => {
@@ -128,23 +140,36 @@ export default function DailyTaskForm({
     }
     setSelectedTickets(nextTickets);
     setSelectedTicketIds(nextTickets.map(t => t.id));
-    buildRows(daySchedule, nextTickets);
+    buildRows(daySchedule, nextTickets, safeTarget);
   };
 
   const handleSelectAll = (allTickets) => {
     setSelectedTickets(allTickets);
     setSelectedTicketIds(allTickets.map(t => t.id));
-    buildRows(daySchedule, allTickets);
+    buildRows(daySchedule, allTickets, safeTarget);
   };
 
   const handleDeselectAll = () => {
     setSelectedTickets([]);
     setSelectedTicketIds([]);
-    buildRows(daySchedule, []);
+    buildRows(daySchedule, [], safeTarget);
   };
 
   const totalHours = rows.reduce((sum, r) => sum + (parseFloat(r.timeInHrs) || 0), 0);
-  const progressPercent = Math.min(100, (totalHours / 8.0) * 100);
+  const progressPercent = Math.min(100, (totalHours / safeTarget) * 100);
+  const diff = totalHours - safeTarget;
+  const isGoalReached = diff >= -0.05;
+  const isGoalExceeded = diff > 0.05;
+  const remaining = Math.max(0, safeTarget - totalHours);
+
+  let badgeText = '';
+  if (isGoalExceeded) {
+    badgeText = `🎯 +${diff.toFixed(1)}h extra`;
+  } else if (isGoalReached) {
+    badgeText = `🎯 Perfect ${safeTarget.toFixed(1)}h Day`;
+  } else {
+    badgeText = `${remaining.toFixed(1)}h remaining`;
+  }
 
   const handleRowChange = (id, field, value) => {
     setRows(prev => prev.map(r => r.id === id ? { ...r, [field]: value } : r));
@@ -296,7 +321,7 @@ export default function DailyTaskForm({
       {/* Azure DevOps Ticket Selector Card */}
       <AdoTicketSelector 
         currentUser={currentUser}
-        remainingDevHours={daySchedule ? daySchedule.remainingDevHours : 6.5}
+        remainingDevHours={daySchedule ? Math.max(0.5, safeTarget - daySchedule.totalScheduledHours) : Math.max(0.5, safeTarget - 1.5)}
         scheduledHours={daySchedule ? daySchedule.totalScheduledHours : 1.5}
         selectedTicketIds={selectedTicketIds}
         onToggleTicket={handleToggleTicket}
@@ -474,17 +499,45 @@ export default function DailyTaskForm({
             <span className="hours-total-label">
               <Clock size={16} className="clock-icon" /> Daily Total:
             </span>
-            <span className={`hours-total-value ${Math.abs(totalHours - 8.0) < 0.05 ? 'goal-reached' : ''}`}>
-              <strong>{totalHours.toFixed(1)}</strong> / 8.0 hrs
-            </span>
-            <span className={`hours-badge ${Math.abs(totalHours - 8.0) < 0.05 ? 'badge-success' : 'badge-warning'}`}>
-              {Math.abs(totalHours - 8.0) < 0.05 ? '🎯 Perfect 8.0h Day' : `${(8.0 - totalHours).toFixed(1)}h remaining`}
+
+            <div className="hours-total-display">
+              <span className={`hours-logged-value ${isGoalReached ? 'goal-reached' : ''}`}>
+                <strong>{totalHours.toFixed(1)}</strong>
+              </span>
+              <span className="hours-divider">/</span>
+              <div className="target-hours-control" title="Click to edit daily target hours (default: 6.0 hrs)">
+                <input
+                  type="number"
+                  id="target-daily-hours-input"
+                  className="target-hours-input"
+                  min="0.5"
+                  max="24"
+                  step="0.5"
+                  value={targetDailyHours}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value);
+                    setTargetDailyHours(isNaN(val) ? '' : val);
+                  }}
+                  onBlur={(e) => {
+                    const parsed = parseFloat(e.target.value);
+                    const safe = (!isNaN(parsed) && parsed >= 0.5) ? Math.round(parsed * 2) / 2 : 6.0;
+                    setTargetDailyHours(safe);
+                    localStorage.setItem('eod_target_daily_hours', safe.toString());
+                  }}
+                />
+                <span className="target-hours-unit">hrs</span>
+                <Edit2 size={12} className="target-edit-hint" />
+              </div>
+            </div>
+
+            <span className={`hours-badge ${isGoalReached ? 'badge-success' : 'badge-warning'}`}>
+              {badgeText}
             </span>
           </div>
 
           <div className="progress-track">
             <div 
-              className={`progress-fill ${Math.abs(totalHours - 8.0) < 0.05 ? 'completed' : ''}`}
+              className={`progress-fill ${isGoalReached ? 'completed' : ''}`}
               style={{ width: `${progressPercent}%` }}
             ></div>
           </div>
