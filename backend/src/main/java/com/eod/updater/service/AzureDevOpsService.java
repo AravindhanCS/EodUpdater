@@ -519,10 +519,20 @@ public class AzureDevOpsService {
                 if (node.hasNonNull("project")) this.project = node.get("project").asText();
                 if (node.hasNonNull("pat")) this.pat = node.get("pat").asText();
                 if (node.hasNonNull("targetState")) this.targetState = node.get("targetState").asText();
-                log.info("Loaded ADO config: Org={}, Project={}", this.orgUrl, this.project);
+                log.info("Loaded ADO config from file: Org={}, Project={}", this.orgUrl, this.project);
             }
         } catch (Exception e) {
             log.warn("Could not read persistent ADO config: {}", e.getMessage());
+        }
+
+        // Environment Variable fallback (for Render / Docker cloud deployments)
+        if (this.pat == null || this.pat.isBlank()) {
+            String envPat = System.getenv("EOD_ADO_PAT");
+            if (envPat == null || envPat.isBlank()) envPat = System.getenv("ADO_PAT");
+            if (envPat != null && !envPat.isBlank()) {
+                this.pat = envPat.trim();
+                log.info("Loaded Azure DevOps PAT from environment variable (length: {})", this.pat.length());
+            }
         }
     }
 
