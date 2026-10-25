@@ -9,14 +9,17 @@ import {
   AlertCircle,
   GitPullRequest,
   Key,
-  Globe
+  Globe,
+  Link2,
+  CloudDownload
 } from 'lucide-react';
 import { 
   saveAppConfig, 
   fetchStatus, 
   fetchAdoConfig, 
   saveAdoConfig, 
-  testAdoConnection 
+  testAdoConnection,
+  pullLatestFromSharePoint
 } from '../services/api';
 
 export default function ConfigModal({
@@ -32,7 +35,10 @@ export default function ConfigModal({
   // Excel settings
   const [filePath, setFilePath] = useState(currentPath || '');
   const [user, setUser] = useState(currentUser || '');
+  const [sharePointUrl, setSharePointUrl] = useState('');
   const [testResult, setTestResult] = useState(null);
+  const [spTestResult, setSpTestResult] = useState(null);
+  const [isTestingSp, setIsTestingSp] = useState(false);
 
   // ADO settings
   const [adoOrgUrl, setAdoOrgUrl] = useState('https://dev.azure.com/simplicitysystems');
@@ -47,8 +53,19 @@ export default function ConfigModal({
   useEffect(() => {
     if (isOpen) {
       loadAdoConfig();
+      loadAppStatus();
     }
   }, [isOpen]);
+
+  const loadAppStatus = async () => {
+    try {
+      const data = await fetchStatus();
+      if (data.sharePointUrl) setSharePointUrl(data.sharePointUrl);
+      if (data.configuredFilePath && !filePath) setFilePath(data.configuredFilePath);
+    } catch (e) {
+      console.warn('Could not load app status in modal:', e);
+    }
+  };
 
   const loadAdoConfig = async () => {
     try {
@@ -87,6 +104,36 @@ export default function ConfigModal({
     }
   };
 
+  const handleTestSharePoint = async () => {
+    if (!sharePointUrl) {
+      setSpTestResult({ success: false, message: 'Please enter a SharePoint URL first.' });
+      return;
+    }
+    setIsTestingSp(true);
+    setSpTestResult(null);
+    try {
+      const res = await pullLatestFromSharePoint(filePath, sharePointUrl);
+      if (res.success) {
+        setSpTestResult({
+          success: true,
+          message: `Connected to SharePoint successfully! Found ${res.sheets?.length || 0} sheets.`
+        });
+      } else {
+        setSpTestResult({
+          success: false,
+          message: res.message || 'SharePoint test failed'
+        });
+      }
+    } catch (e) {
+      setSpTestResult({
+        success: false,
+        message: e.message || 'SharePoint test failed'
+      });
+    } finally {
+      setIsTestingSp(false);
+    }
+  };
+
   const handleTestAdo = async () => {
     setAdoTestResult({ testing: true });
     try {
@@ -108,10 +155,11 @@ export default function ConfigModal({
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      // 1. Save Excel config
+      // 1. Save Excel & SharePoint config
       await saveAppConfig({
         filePath,
-        currentUser: user
+        currentUser: user,
+        sharePointUrl
       });
 
       // 2. Save ADO config
@@ -276,13 +324,49 @@ export default function ConfigModal({
               </div>
 
               <div className="setting-field">
+                <label htmlFor="config-sharepoint-url">
+                  SharePoint Online Sharing Link ("Anyone with the link can view")
+                </label>
+                <p className="setting-help">
+                  Paste the SharePoint link to <code>Effort Tracker - Simplicity.xlsx</code> with <strong>"Anyone with the link can view"</strong> permission for automatic cloud sync.
+                </p>
+                <div className="input-with-action">
+                  <input 
+                    id="config-sharepoint-url"
+                    type="text" 
+                    className="styled-input"
+                    value={sharePointUrl}
+                    onChange={(e) => {
+                      setSharePointUrl(e.target.value);
+                      setSpTestResult(null);
+                    }}
+                    placeholder="https://psiog0-my.sharepoint.com/:x:/g/personal/... or direct sharing link"
+                  />
+                  <button 
+                    type="button" 
+                    className="btn-secondary test-btn"
+                    onClick={handleTestSharePoint}
+                    disabled={isTestingSp || !sharePointUrl}
+                  >
+                    {isTestingSp ? 'Syncing...' : 'Sync Now'}
+                  </button>
+                </div>
+                {spTestResult && (
+                  <div className={`test-feedback ${spTestResult.success ? 'success' : 'error'}`}>
+                    {spTestResult.success ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
+                    <span>{spTestResult.message}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="setting-field">
                 <label htmlFor="config-default-user">Default Member Name</label>
                 <p className="setting-help">Pre-filled on daily startup</p>
                 <select 
-                  id="config-default-user"
-                  className="styled-select"
-                  value={user}
-                  onChange={(e) => setUser(e.target.value)}
+                    id="config-default-user"
+                    className="styled-select"
+                    value={user}
+                    onChange={(e) => setUser(e.target.value)}
                 >
                   {teamMembers.map(m => (
                     <option key={m} value={m}>{m}</option>

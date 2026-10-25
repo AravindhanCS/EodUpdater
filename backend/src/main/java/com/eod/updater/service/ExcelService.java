@@ -14,7 +14,13 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.*;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -366,12 +372,101 @@ public class ExcelService {
         }
     }
 
+    public String getSharePointUrl() {
+        return sharePointUrl;
+    }
+
+    public void setSharePointUrl(String sharePointUrl) {
+        this.sharePointUrl = sharePointUrl;
+    }
+
+    public byte[] downloadFromSharePoint(String urlString) throws IOException, InterruptedException {
+        if (urlString == null || urlString.isBlank()) {
+            throw new IllegalArgumentException("SharePoint URL cannot be empty");
+        }
+
+        String targetUrl = urlString.trim();
+        if (!targetUrl.contains("download=1")) {
+            if (targetUrl.contains("?")) {
+                targetUrl += "&download=1";
+            } else {
+                targetUrl += "?download=1";
+            }
+        }
+
+        HttpClient client = HttpClient.newBuilder()
+                .followRedirects(HttpClient.Redirect.ALWAYS)
+                .connectTimeout(Duration.ofSeconds(20))
+                .build();
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(targetUrl))
+                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                .header("Accept", "*/*")
+                .timeout(Duration.ofSeconds(45))
+                .GET()
+                .build();
+
+        HttpResponse<byte[]> response = client.send(request, HttpResponse.BodyHandlers.ofByteArray());
+        int statusCode = response.statusCode();
+
+        if (statusCode == 403 || statusCode == 401) {
+            throw new IllegalStateException("SharePoint access denied (HTTP " + statusCode + "). Please make sure the link is set to 'Anyone with the link can view' in SharePoint.");
+        }
+
+        if (statusCode != 200) {
+            throw new IOException("SharePoint returned HTTP " + statusCode + " while downloading file");
+        }
+
+        byte[] bytes = response.body();
+        // Validate if it is a valid ZIP/XLSX file (magic bytes: PK\x03\x04 = 0x50, 0x4B, 0x03, 0x04)
+        if (bytes.length < 4 || bytes[0] != 0x50 || bytes[1] != 0x4B) {
+            String htmlPreview = new String(bytes, 0, Math.min(bytes.length, 300), StandardCharsets.UTF_8);
+            if (htmlPreview.contains("<html") || htmlPreview.contains("<!DOCTYPE") || htmlPreview.contains("Sign in")) {
+                throw new IllegalStateException("SharePoint returned a Microsoft login page instead of the Excel file. Please ensure the link permission is set to 'Anyone with the link can view'.");
+            }
+            throw new IOException("Downloaded file from SharePoint is not a valid Excel (.xlsx) file");
+        }
+
+        return bytes;
+    }
+
     public void pullLatestFromSharePoint(String filePath) throws IOException, InterruptedException {
+        // 1. If sharePointUrl is configured, first try direct HTTP download (cross-platform, works on Linux & Windows!)
+        if (sharePointUrl != null && !sharePointUrl.isBlank()) {
+            try {
+                log.info("Attempting direct HTTP download from SharePoint URL: {}", sharePointUrl);
+                byte[] bytes = downloadFromSharePoint(sharePointUrl);
+                File file = new File(filePath);
+                if (file.getParentFile() != null && !file.getParentFile().exists()) {
+                    file.getParentFile().mkdirs();
+                }
+                if (file.exists()) {
+                    createBackup(file);
+                }
+                Files.write(file.toPath(), bytes);
+                log.info("Successfully pulled latest file directly from SharePoint via HTTP ({} bytes)", bytes.length);
+                return;
+            } catch (IllegalStateException ise) {
+                String os = System.getProperty("os.name", "").toLowerCase();
+                if (!os.contains("win")) {
+                    throw ise;
+                }
+                log.warn("Direct SharePoint HTTP download requires authentication ({}). Falling back to Windows COM PowerShell...", ise.getMessage());
+            } catch (Exception e) {
+                String os = System.getProperty("os.name", "").toLowerCase();
+                if (!os.contains("win")) {
+                    throw new RuntimeException("Failed to download from SharePoint: " + e.getMessage(), e);
+                }
+                log.warn("Direct SharePoint download failed ({}). Falling back to Windows COM PowerShell...", e.getMessage());
+            }
+        }
+
+        // 2. Fallback to Windows COM PowerShell automation (only if running on Windows with Office)
         String os = System.getProperty("os.name", "").toLowerCase();
         if (!os.contains("win")) {
             throw new UnsupportedOperationException(
-                    "SharePoint desktop sync uses Windows Excel COM and runs on your local Windows PC. " +
-                    "On cloud hosting (Linux), please upload your Effort Tracker (.xlsx) via the 'Upload Tracker' option below."
+                    "SharePoint URL requires authentication. Please generate an 'Anyone with the link can view' sharing link in SharePoint so the cloud app can read it automatically."
             );
         }
 

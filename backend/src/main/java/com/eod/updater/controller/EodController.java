@@ -140,13 +140,26 @@ public class EodController {
     }
 
     @PostMapping("/sharepoint/pull")
-    public ResponseEntity<Map<String, Object>> pullFromSharePoint(@RequestParam(required = false) String path) {
+    public ResponseEntity<Map<String, Object>> pullFromSharePoint(
+            @RequestParam(required = false) String path,
+            @RequestParam(required = false) String url) {
         String effectivePath = resolveEffectivePath(path);
+        if (url != null && !url.isBlank()) {
+            this.sharePointUrl = url.trim();
+            this.excelService.setSharePointUrl(this.sharePointUrl);
+        }
         Map<String, Object> resp = new HashMap<>();
         try {
             excelService.pullLatestFromSharePoint(effectivePath);
             resp.put("success", true);
-            resp.put("message", "Successfully pulled latest live data from SharePoint Online!");
+            resp.put("message", "Successfully pulled and updated latest data directly from SharePoint Online!");
+            resp.put("filePath", effectivePath);
+            resp.put("sheets", excelService.getSheets(effectivePath));
+            return ResponseEntity.ok(resp);
+        } catch (IllegalStateException ise) {
+            resp.put("success", false);
+            resp.put("isAuthError", true);
+            resp.put("message", ise.getMessage());
             return ResponseEntity.ok(resp);
         } catch (UnsupportedOperationException uoe) {
             resp.put("success", false);
@@ -225,9 +238,14 @@ public class EodController {
         if (body.containsKey("currentUser") && !body.get("currentUser").isBlank()) {
             this.defaultUser = body.get("currentUser").trim();
         }
+        if (body.containsKey("sharePointUrl") && !body.get("sharePointUrl").isBlank()) {
+            this.sharePointUrl = body.get("sharePointUrl").trim();
+            this.excelService.setSharePointUrl(this.sharePointUrl);
+        }
         Map<String, String> resp = new HashMap<>();
         resp.put("filePath", this.defaultFilePath);
         resp.put("currentUser", this.defaultUser);
+        resp.put("sharePointUrl", this.sharePointUrl);
         resp.put("message", "Configuration updated successfully");
         return ResponseEntity.ok(resp);
     }

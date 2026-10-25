@@ -186,10 +186,13 @@ export default function DashboardView({ activeSprint, filePath, onTrackerUploade
     setError(null);
     try {
       const res = await pullLatestFromSharePoint(filePath);
-      if (res?.isCloudEnvironment || !res?.success) {
-        setCloudNotice(res?.message || 'SharePoint COM sync runs on your local Windows PC with Excel. On cloud hosting, please upload your Effort Tracker (.xlsx) directly.');
+      if (res?.isAuthError) {
+        setCloudNotice(res?.message || 'SharePoint access denied. Please generate an "Anyone with the link can view" sharing link in SharePoint and paste it in Settings.');
+      } else if (res?.isCloudEnvironment || !res?.success) {
+        setCloudNotice(res?.message || 'SharePoint COM sync is supported when running locally on Windows. For cloud hosting, please set your "Anyone with the link can view" SharePoint link in Settings or upload the tracker directly.');
       } else {
         await loadData(selectedSprint);
+        if (onTrackerUploaded) onTrackerUploaded();
         setSyncNotice('Successfully pulled latest live entries from SharePoint Online!');
         setTimeout(() => setSyncNotice(null), 5000);
       }

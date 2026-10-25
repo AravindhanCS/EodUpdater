@@ -36,8 +36,11 @@ export async function fetchSprintAnalytics(sheetName = '', path = '') {
   return res.json();
 }
 
-export async function pullLatestFromSharePoint(path = '') {
-  const url = path ? `${API_BASE}/sharepoint/pull?path=${encodeURIComponent(path)}` : `${API_BASE}/sharepoint/pull`;
+export async function pullLatestFromSharePoint(path = '', sharePointUrl = '') {
+  const params = new URLSearchParams();
+  if (path) params.append('path', path);
+  if (sharePointUrl) params.append('url', sharePointUrl);
+  const url = `${API_BASE}/sharepoint/pull${params.toString() ? `?${params.toString()}` : ''}`;
   const res = await fetch(url, { method: 'POST' });
   const data = await res.json();
   if (!res.ok) {
