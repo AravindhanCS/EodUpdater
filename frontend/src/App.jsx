@@ -200,6 +200,7 @@ export default function App() {
           <DashboardView 
             activeSprint={activeSprint} 
             filePath={status?.configuredFilePath} 
+            onTrackerUploaded={() => loadAppStatus()}
           />
         ) : (
           /* EOD Daily Task Logging Page */

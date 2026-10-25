@@ -40,8 +40,22 @@ export async function pullLatestFromSharePoint(path = '') {
   const url = path ? `${API_BASE}/sharepoint/pull?path=${encodeURIComponent(path)}` : `${API_BASE}/sharepoint/pull`;
   const res = await fetch(url, { method: 'POST' });
   const data = await res.json();
-  if (!res.ok || !data.success) {
+  if (!res.ok) {
     throw new Error(data.message || 'SharePoint pull failed');
+  }
+  return data;
+}
+
+export async function uploadTrackerFile(file) {
+  const formData = new FormData();
+  formData.append('file', file);
+  const res = await fetch(`${API_BASE}/upload-tracker`, {
+    method: 'POST',
+    body: formData,
+  });
+  const data = await res.json();
+  if (!res.ok || !data.success) {
+    throw new Error(data.message || 'Failed to upload effort tracker');
   }
   return data;
 }

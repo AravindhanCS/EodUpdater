@@ -38,14 +38,16 @@ import {
   Tag,
   Zap,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  UploadCloud
 } from 'lucide-react';
 import { 
   fetchSprintAnalytics, 
   pullLatestFromSharePoint, 
   saveMissingLogReason, 
   clearMissingLogReason,
-  fetchSprintStoryPoints 
+  fetchSprintStoryPoints,
+  uploadTrackerFile
 } from '../services/api';
 
 const PRESET_REASONS = [
@@ -58,7 +60,7 @@ const PRESET_REASONS = [
   'Other'
 ];
 
-export default function DashboardView({ activeSprint, filePath }) {
+export default function DashboardView({ activeSprint, filePath, onTrackerUploaded }) {
   const [analytics, setAnalytics] = useState(null);
   const [selectedSprint, setSelectedSprint] = useState(activeSprint || '2.14.10.1');
   const [isLoading, setIsLoading] = useState(true);
@@ -67,6 +69,9 @@ export default function DashboardView({ activeSprint, filePath }) {
   const [ticketSearch, setTicketSearch] = useState('');
   const [error, setError] = useState(null);
   const [syncNotice, setSyncNotice] = useState(null);
+  const [cloudNotice, setCloudNotice] = useState(null);
+  const [isUploadingTracker, setIsUploadingTracker] = useState(false);
+  const [uploadError, setUploadError] = useState(null);
 
   // Quality & Compliance tab & filter state
   const [complianceTab, setComplianceTab] = useState('all'); // 'all' | 'missingLogs' | 'hoursAnomalies' | 'missingFields'
@@ -154,15 +159,40 @@ export default function DashboardView({ activeSprint, filePath }) {
     setExpandedResourceTickets(next);
   };
 
+  const handleTrackerFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingTracker(true);
+    setUploadError(null);
+    try {
+      await uploadTrackerFile(file);
+      setSyncNotice(`Effort Tracker "${file.name}" uploaded successfully! Refreshing analytics...`);
+      setCloudNotice(null);
+      await loadData(selectedSprint);
+      if (onTrackerUploaded) onTrackerUploaded();
+      setTimeout(() => setSyncNotice(null), 5000);
+    } catch (err) {
+      setUploadError(err.message || 'Failed to upload tracker file');
+    } finally {
+      setIsUploadingTracker(false);
+      e.target.value = '';
+    }
+  };
+
   const handleSyncSharePoint = async () => {
     setIsSyncingSharePoint(true);
     setSyncNotice(null);
+    setCloudNotice(null);
     setError(null);
     try {
-      await pullLatestFromSharePoint(filePath);
-      await loadData(selectedSprint);
-      setSyncNotice('Successfully pulled latest live entries from SharePoint Online!');
-      setTimeout(() => setSyncNotice(null), 5000);
+      const res = await pullLatestFromSharePoint(filePath);
+      if (res?.isCloudEnvironment || !res?.success) {
+        setCloudNotice(res?.message || 'SharePoint COM sync runs on your local Windows PC with Excel. On cloud hosting, please upload your Effort Tracker (.xlsx) directly.');
+      } else {
+        await loadData(selectedSprint);
+        setSyncNotice('Successfully pulled latest live entries from SharePoint Online!');
+        setTimeout(() => setSyncNotice(null), 5000);
+      }
     } catch (err) {
       setError('SharePoint sync error: ' + (err.message || 'Failed to pull live SharePoint file'));
     } finally {
@@ -394,6 +424,28 @@ export default function DashboardView({ activeSprint, filePath }) {
         </div>
       )}
 
+      {/* Cloud Environment / SharePoint COM Notice */}
+      {cloudNotice && (
+        <div className="dashboard-notice-banner glass-panel animate-fade-in">
+          <Info size={20} className="notice-icon text-cyan" />
+          <div className="notice-text">
+            <strong>Cloud Environment Notice:</strong> {cloudNotice}
+          </div>
+          <button className="notice-close" onClick={() => setCloudNotice(null)}>✕</button>
+        </div>
+      )}
+
+      {/* Upload Error Banner */}
+      {uploadError && (
+        <div className="dashboard-error-banner glass-panel animate-fade-in">
+          <AlertCircle size={20} className="error-icon" />
+          <div className="error-text">
+            <strong>Upload Error:</strong> {uploadError}
+          </div>
+          <button className="notice-close" onClick={() => setUploadError(null)}>✕</button>
+        </div>
+      )}
+
       {/* Error Alert */}
       {error && (
         <div className="dashboard-error-banner glass-panel">
@@ -404,6 +456,38 @@ export default function DashboardView({ activeSprint, filePath }) {
           <button className="action-btn secondary-btn" onClick={() => loadData(selectedSprint)}>
             Retry
           </button>
+        </div>
+      )}
+
+      {/* Cloud Upload Prompt: shown if totalRows is 0 */}
+      {(!isLoading && (!analytics || analytics?.totalRows === 0)) && (
+        <div className="dashboard-upload-prompt-card glass-panel animate-fade-in">
+          <div className="upload-prompt-left">
+            <div className="upload-prompt-icon-wrap">
+              <UploadCloud size={28} />
+            </div>
+            <div>
+              <h4 className="upload-prompt-title">Effort Tracker Workbook Not Found on Server</h4>
+              <p className="upload-prompt-desc">
+                The cloud backend doesn't have your local <code>Effort Tracker - Simplicity.xlsx</code> file yet.
+                Upload your workbook once to immediately activate live team sprint hours, developer deep-dives, quality compliance checks, and leaderboard insights!
+              </p>
+            </div>
+          </div>
+          <div className="upload-prompt-actions">
+            <label className="action-btn primary-btn upload-tracker-btn" htmlFor="dashboard-file-upload">
+              <UploadCloud size={16} />
+              <span>{isUploadingTracker ? 'Uploading Workbook...' : 'Upload Effort Tracker (.xlsx)'}</span>
+            </label>
+            <input 
+              id="dashboard-file-upload" 
+              type="file" 
+              accept=".xlsx,.xls" 
+              onChange={handleTrackerFileUpload} 
+              style={{ display: 'none' }} 
+              disabled={isUploadingTracker}
+            />
+          </div>
         </div>
       )}
 

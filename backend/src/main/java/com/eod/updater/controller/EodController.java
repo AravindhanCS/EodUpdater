@@ -41,9 +41,33 @@ public class EodController {
         this.objectMapper = objectMapper;
     }
 
+    private String resolveEffectivePath(String requestedPath) {
+        if (requestedPath != null && !requestedPath.isBlank()) {
+            File f = new File(requestedPath);
+            if (f.exists()) {
+                return requestedPath;
+            }
+        }
+        if (defaultFilePath != null && !defaultFilePath.isBlank()) {
+            File df = new File(defaultFilePath);
+            if (df.exists()) {
+                return defaultFilePath;
+            }
+        }
+        File uploaded = new File("data/Effort_Tracker.xlsx");
+        if (uploaded.exists()) {
+            return uploaded.getAbsolutePath();
+        }
+        File rootFile = new File("Effort Tracker - Simplicity.xlsx");
+        if (rootFile.exists()) {
+            return rootFile.getAbsolutePath();
+        }
+        return (defaultFilePath != null && !defaultFilePath.isBlank()) ? defaultFilePath : "data/Effort_Tracker.xlsx";
+    }
+
     @GetMapping("/status")
     public ResponseEntity<AppStatusResponse> getStatus(@RequestParam(required = false) String path) {
-        String effectivePath = (path != null && !path.isBlank()) ? path : defaultFilePath;
+        String effectivePath = resolveEffectivePath(path);
         File file = new File(effectivePath);
 
         AppStatusResponse resp = new AppStatusResponse();
@@ -69,7 +93,7 @@ public class EodController {
 
     @GetMapping("/sheets")
     public ResponseEntity<List<SheetInfo>> getSheets(@RequestParam(required = false) String path) throws IOException {
-        String effectivePath = (path != null && !path.isBlank()) ? path : defaultFilePath;
+        String effectivePath = resolveEffectivePath(path);
         return ResponseEntity.ok(excelService.getSheets(effectivePath));
     }
 
@@ -78,7 +102,7 @@ public class EodController {
             @RequestParam(required = false) String path,
             @RequestParam(required = false) String sheetName,
             @RequestParam(defaultValue = "30") int limit) throws IOException {
-        String effectivePath = (path != null && !path.isBlank()) ? path : defaultFilePath;
+        String effectivePath = resolveEffectivePath(path);
         return ResponseEntity.ok(excelService.getRecentEntries(effectivePath, sheetName, limit));
     }
 
@@ -86,18 +110,48 @@ public class EodController {
     public ResponseEntity<SprintAnalyticsResponse> getSprintAnalytics(
             @RequestParam(required = false) String path,
             @RequestParam(required = false) String sheetName) throws IOException {
-        String effectivePath = (path != null && !path.isBlank()) ? path : defaultFilePath;
+        String effectivePath = resolveEffectivePath(path);
         return ResponseEntity.ok(excelService.getSprintAnalytics(effectivePath, sheetName));
+    }
+
+    @PostMapping(value = "/upload-tracker", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> uploadTrackerFile(@RequestParam("file") MultipartFile file) {
+        if (file.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Uploaded file is empty"));
+        }
+        try {
+            File dataDir = new File("data");
+            if (!dataDir.exists()) {
+                dataDir.mkdirs();
+            }
+            File dest = new File(dataDir, "Effort_Tracker.xlsx");
+            file.transferTo(dest);
+            this.defaultFilePath = dest.getAbsolutePath();
+
+            Map<String, Object> resp = new HashMap<>();
+            resp.put("success", true);
+            resp.put("message", "Effort tracker uploaded successfully!");
+            resp.put("filePath", dest.getAbsolutePath());
+            resp.put("sheets", excelService.getSheets(dest.getAbsolutePath()));
+            return ResponseEntity.ok(resp);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("success", false, "message", "Failed to save file: " + e.getMessage()));
+        }
     }
 
     @PostMapping("/sharepoint/pull")
     public ResponseEntity<Map<String, Object>> pullFromSharePoint(@RequestParam(required = false) String path) {
-        String effectivePath = (path != null && !path.isBlank()) ? path : defaultFilePath;
+        String effectivePath = resolveEffectivePath(path);
         Map<String, Object> resp = new HashMap<>();
         try {
             excelService.pullLatestFromSharePoint(effectivePath);
             resp.put("success", true);
             resp.put("message", "Successfully pulled latest live data from SharePoint Online!");
+            return ResponseEntity.ok(resp);
+        } catch (UnsupportedOperationException uoe) {
+            resp.put("success", false);
+            resp.put("isCloudEnvironment", true);
+            resp.put("message", uoe.getMessage());
             return ResponseEntity.ok(resp);
         } catch (Exception e) {
             resp.put("success", false);
@@ -108,9 +162,7 @@ public class EodController {
 
     @PostMapping("/submit")
     public ResponseEntity<EodSubmitResponse> submitEntries(@RequestBody EodSubmitRequest request) {
-        String effectivePath = (request.getFilePath() != null && !request.getFilePath().isBlank())
-                ? request.getFilePath()
-                : defaultFilePath;
+        String effectivePath = resolveEffectivePath(request.getFilePath());
 
         String sheetName = (request.getSheetName() != null && !request.getSheetName().isBlank())
                 ? request.getSheetName()

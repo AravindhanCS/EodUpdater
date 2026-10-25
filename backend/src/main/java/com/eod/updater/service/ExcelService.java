@@ -325,6 +325,12 @@ public class ExcelService {
     }
 
     public void syncToSharePoint(String targetSheetName, List<EodEntry> entries) throws IOException, InterruptedException {
+        String os = System.getProperty("os.name", "").toLowerCase();
+        if (!os.contains("win")) {
+            log.info("Skipping SharePoint desktop COM sync: running on non-Windows cloud environment ({})", os);
+            return;
+        }
+
         File tempJson = File.createTempFile("eod_entries_", ".json");
         try {
             objectMapper.writeValue(tempJson, entries);
@@ -361,6 +367,14 @@ public class ExcelService {
     }
 
     public void pullLatestFromSharePoint(String filePath) throws IOException, InterruptedException {
+        String os = System.getProperty("os.name", "").toLowerCase();
+        if (!os.contains("win")) {
+            throw new UnsupportedOperationException(
+                    "SharePoint desktop sync uses Windows Excel COM and runs on your local Windows PC. " +
+                    "On cloud hosting (Linux), please upload your Effort Tracker (.xlsx) via the 'Upload Tracker' option below."
+            );
+        }
+
         File file = new File(filePath);
         String backupPath = createBackup(file);
         log.info("Created backup before SharePoint pull: {}", backupPath);
@@ -740,7 +754,33 @@ public class ExcelService {
     public SprintAnalyticsResponse getSprintAnalytics(String filePath, String sheetName) throws IOException {
         File file = new File(filePath);
         if (!file.exists()) {
-            throw new FileNotFoundException("Excel file not found at path: " + filePath);
+            log.warn("Excel file not found at path: {}. Returning empty sprint analytics.", filePath);
+            SprintAnalyticsResponse resp = new SprintAnalyticsResponse();
+            String targetSprint = (sheetName != null && !sheetName.isBlank())
+                    ? sheetName.trim()
+                    : sprintService.getCurrentSprintName();
+            resp.setSprintName(targetSprint);
+            resp.setAvailableSprints(Collections.emptyList());
+            resp.setTotalRows(0);
+            resp.setTotalHours(0);
+            resp.setTotalUniqueTickets(0);
+            resp.setTotalCompletedTickets(0);
+            resp.setCompletionRate(0);
+            resp.setActiveDevelopersCount(0);
+            resp.setAvgHoursPerDeveloper(0);
+            resp.setAvgHoursPerTicket(0);
+            resp.setHoursLeaderboard(Collections.emptyList());
+            resp.setCompletionLeaderboard(Collections.emptyList());
+            resp.setDeveloperAnalytics(Collections.emptyList());
+            resp.setCategoryBreakdown(Collections.emptyList());
+            resp.setHighEffortTickets(Collections.emptyList());
+            resp.setDailyVelocity(Collections.emptyList());
+            resp.setTeamProductiveHours(0);
+            resp.setTeamOverheadHours(0);
+            resp.setTeamProductivePercentage(0);
+            resp.setTeamOverheadPercentage(0);
+            resp.setComplianceReport(new ComplianceReport());
+            return resp;
         }
 
         List<String> availableSprints = new ArrayList<>();
@@ -776,6 +816,11 @@ public class ExcelService {
             resp.setCategoryBreakdown(Collections.emptyList());
             resp.setHighEffortTickets(Collections.emptyList());
             resp.setDailyVelocity(Collections.emptyList());
+            resp.setTeamProductiveHours(0);
+            resp.setTeamOverheadHours(0);
+            resp.setTeamProductivePercentage(0);
+            resp.setTeamOverheadPercentage(0);
+            resp.setComplianceReport(new ComplianceReport());
             return resp;
         }
 
