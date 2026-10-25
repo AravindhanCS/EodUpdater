@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: eod-updater-backend
+    env: docker
+    dockerfilePath: backend/Dockerfile
+    dockerContext: backend
+    plan: free
+    region: oregon
+    healthCheckPath: /api/eod/status

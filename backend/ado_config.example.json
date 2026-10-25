@@ -1,0 +1,6 @@
+{
+  "orgUrl": "https://dev.azure.com/simplicitysystems",
+  "project": "SimplicityCollect",
+  "pat": "YOUR_AZURE_DEVOPS_PERSONAL_ACCESS_TOKEN",
+  "targetState": "Development"
+}
