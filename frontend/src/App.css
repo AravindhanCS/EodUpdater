@@ -5,10 +5,13 @@
 .app-container {
   max-width: 1320px;
   margin: 0 auto;
-  padding: 24px 20px 60px 20px;
+  padding: 20px 16px 60px 16px;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 20px;
+  width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
 }
 
 /* ----------------- HEADER ----------------- */
@@ -16,10 +19,13 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 24px;
-  position: sticky;
-  top: 16px;
-  z-index: 50;
+  padding: 12px 20px;
+  position: relative; /* Scrolls naturally with page (not sticky) */
+  top: auto;
+  z-index: 20;
+  gap: 12px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .header-left {
@@ -83,7 +89,9 @@
 .header-right {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  flex-shrink: 0;
+  margin-left: auto;
 }
 
 .mode-toggle-group {
@@ -92,18 +100,20 @@
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   padding: 3px;
+  flex-shrink: 0;
 }
 
 .mode-btn {
-  padding: 6px 12px;
-  font-size: 0.8rem;
+  padding: 5px 10px;
+  font-size: 0.78rem;
   font-weight: 600;
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-muted);
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
+  white-space: nowrap;
 }
 
 .mode-btn.active {
@@ -115,20 +125,22 @@
 .status-pill {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 14px;
+  gap: 7px;
+  padding: 5px 12px;
   border-radius: var(--radius-md);
   background: var(--bg-input);
   border: 1px solid var(--border-subtle);
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   font-weight: 500;
-  max-width: 280px;
+  max-width: 175px;
+  flex-shrink: 1;
 }
 
 .status-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
+  flex-shrink: 0;
 }
 
 .status-dot.green {
@@ -152,6 +164,8 @@
   background: rgba(59, 130, 246, 0.08);
   border-color: rgba(59, 130, 246, 0.25);
   color: #60a5fa;
+  max-width: 135px;
+  flex-shrink: 0;
 }
 
 .status-text {
@@ -161,9 +175,16 @@
   color: var(--text-muted);
 }
 
+.header-actions-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
 .icon-action-btn {
-  width: 38px;
-  height: 38px;
+  width: 36px;
+  height: 36px;
   border-radius: var(--radius-md);
   background: var(--bg-input);
   border: 1px solid var(--border-subtle);
@@ -171,12 +192,34 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 
 .icon-action-btn:hover {
   background: var(--bg-card-hover);
   color: var(--text-main);
   border-color: rgba(255, 255, 255, 0.2);
+}
+
+@media (max-width: 1250px) {
+  .logo-subtitle {
+    display: none;
+  }
+  .status-pill {
+    max-width: 140px;
+  }
+}
+
+@media (max-width: 1050px) {
+  .header-container {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .header-right {
+    margin-left: 0;
+    width: 100%;
+    justify-content: flex-end;
+  }
 }
 
 /* ----------------- SPRINT OVERVIEW BAR ----------------- */

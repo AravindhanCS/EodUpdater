@@ -72,71 +72,72 @@ export default function Header({
       </nav>
 
       <div className="header-right">
-        {/* Mode Switcher */}
-        <div className="mode-toggle-group">
-          <button 
-            id="mode-direct-btn"
-            className={`mode-btn ${mode === 'direct' ? 'active' : ''}`}
-            onClick={() => onToggleMode('direct')}
-            title="Appends directly to local/synced OneDrive file"
-          >
-            Direct File Sync
-          </button>
-          <button 
-            id="mode-upload-btn"
-            className={`mode-btn ${mode === 'upload' ? 'active' : ''}`}
-            onClick={() => onToggleMode('upload')}
-            title="Upload workbook, append tasks, and download updated file"
-          >
-            <UploadCloud size={14} /> Upload & Download
-          </button>
-        </div>
-
-        {/* File Connection Status Pill */}
-        {mode === 'direct' && (
-          <>
-            <div className={`status-pill ${status?.fileExists ? 'connected' : 'error'}`} title={status?.configuredFilePath}>
-              {status?.fileExists ? (
-                <>
-                  <span className="status-dot green"></span>
-                  <span className="status-text">{fileName}</span>
-                </>
-              ) : (
-                <>
-                  <AlertTriangle size={14} className="status-icon-warn" />
-                  <span className="status-text">File Not Found</span>
-                </>
-              )}
-            </div>
-
-            {status?.sharePointConnected && (
-              <div className="status-pill sharepoint-live-pill" title={`Live SharePoint sync active: ${status.sharePointUrl}`}>
-                <span className="status-dot blue-pulse"></span>
-                <span className="status-text">SharePoint: Live Sync Active</span>
-              </div>
-            )}
-          </>
+        {/* Mode Switcher - only relevant on Daily Task Logger tab */}
+        {activeTab === 'logger' && (
+          <div className="mode-toggle-group">
+            <button 
+              id="mode-direct-btn"
+              className={`mode-btn ${mode === 'direct' ? 'active' : ''}`}
+              onClick={() => onToggleMode('direct')}
+              title="Appends directly to local/synced OneDrive file"
+            >
+              Direct
+            </button>
+            <button 
+              id="mode-upload-btn"
+              className={`mode-btn ${mode === 'upload' ? 'active' : ''}`}
+              onClick={() => onToggleMode('upload')}
+              title="Upload workbook, append tasks, and download updated file"
+            >
+              <UploadCloud size={14} /> Upload
+            </button>
+          </div>
         )}
 
-        {/* Settings Button */}
-        <button 
-          id="settings-modal-btn"
-          className="icon-action-btn" 
-          onClick={onOpenSettings}
-          title="Configure File Path & Defaults"
-        >
-          <Settings size={18} />
-        </button>
+        {/* File Connection Status Pill */}
+        <div className={`status-pill ${status?.fileExists ? 'connected' : 'error'}`} title={status?.configuredFilePath || fileName}>
+          {status?.fileExists ? (
+            <>
+              <span className="status-dot green"></span>
+              <span className="status-text">{fileName}</span>
+            </>
+          ) : (
+            <>
+              <AlertTriangle size={14} className="status-icon-warn" />
+              <span className="status-text">File Not Found</span>
+            </>
+          )}
+        </div>
 
-        {/* Theme Toggle Button */}
-        <button 
-          id="theme-toggle-btn"
-          className="icon-action-btn" 
-          onClick={onToggleTheme}
-          title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-        >
-          {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-        </button>
+        {status?.sharePointConnected && (
+          <div className="status-pill sharepoint-live-pill" title={`Live SharePoint sync active: ${status.sharePointUrl}`}>
+            <span className="status-dot blue-pulse"></span>
+            <span className="status-text">SharePoint Live</span>
+          </div>
+        )}
+
+        {/* Action Icon Controls (Always visible and never pushed off) */}
+        <div className="header-actions-group">
+          {/* Settings Button */}
+          <button 
+            id="settings-modal-btn"
+            className="icon-action-btn" 
+            onClick={onOpenSettings}
+            title="Configure File Path & Defaults"
+          >
+            <Settings size={18} />
+          </button>
+
+          {/* Theme Toggle Button */}
+          <button 
+            id="theme-toggle-btn"
+            className="icon-action-btn" 
+            onClick={onToggleTheme}
+            title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+          >
+            {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
+        </div>
       </div>
     </header>
   );
