@@ -342,8 +342,12 @@ export default function DailyTaskForm({
               <tr key={row.id} className="task-row animate-fade-in">
                 <td className="col-num">
                   <span className="row-index">{idx + 1}</span>
+                  <span className="mobile-task-badge">Task #{idx + 1}</span>
                 </td>
                 <td className="col-ticket">
+                  <label className="mobile-task-label" htmlFor={`ticket-input-${row.id}`}>
+                    Ticket ID / ADO #
+                  </label>
                   <input 
                     type="text" 
                     id={`ticket-input-${row.id}`}
@@ -354,6 +358,9 @@ export default function DailyTaskForm({
                   />
                 </td>
                 <td className="col-category">
+                  <label className="mobile-task-label" htmlFor={`category-select-${row.id}`}>
+                    Work Category
+                  </label>
                   <select 
                     id={`category-select-${row.id}`}
                     className="styled-select category-select"
@@ -366,6 +373,9 @@ export default function DailyTaskForm({
                   </select>
                 </td>
                 <td className="col-hours">
+                  <label className="mobile-task-label" htmlFor={`hours-input-${row.id}`}>
+                    Hours Allocated
+                  </label>
                   <div className="hours-stepper">
                     <button 
                       type="button" 
@@ -396,6 +406,9 @@ export default function DailyTaskForm({
                   </div>
                 </td>
                 <td className="col-desc">
+                  <label className="mobile-task-label" htmlFor={`desc-input-${row.id}`}>
+                    Task Description
+                  </label>
                   <input 
                     type="text" 
                     id={`desc-input-${row.id}`}
