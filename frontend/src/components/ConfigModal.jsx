@@ -19,7 +19,9 @@ import {
   fetchAdoConfig, 
   saveAdoConfig, 
   testAdoConnection,
-  pullLatestFromSharePoint
+  pullLatestFromSharePoint,
+  testPowerAutomateWebhook,
+  testResendEmail
 } from '../services/api';
 
 export default function ConfigModal({
@@ -36,9 +38,16 @@ export default function ConfigModal({
   const [filePath, setFilePath] = useState(currentPath || '');
   const [user, setUser] = useState(currentUser || '');
   const [sharePointUrl, setSharePointUrl] = useState('');
+  const [powerAutomateWebhookUrl, setPowerAutomateWebhookUrl] = useState('');
+  const [resendToEmail, setResendToEmail] = useState('aravindhan.chandrasekaran@psiog.com');
+  const [serverResendConfigured, setServerResendConfigured] = useState(false);
+  const [resendTestResult, setResendTestResult] = useState(null);
+  const [isTestingResend, setIsTestingResend] = useState(false);
   const [testResult, setTestResult] = useState(null);
   const [spTestResult, setSpTestResult] = useState(null);
   const [isTestingSp, setIsTestingSp] = useState(false);
+  const [paTestResult, setPaTestResult] = useState(null);
+  const [isTestingPa, setIsTestingPa] = useState(false);
 
   // ADO settings
   const [adoOrgUrl, setAdoOrgUrl] = useState('https://dev.azure.com/simplicitysystems');
@@ -61,6 +70,9 @@ export default function ConfigModal({
     try {
       const data = await fetchStatus();
       if (data.sharePointUrl) setSharePointUrl(data.sharePointUrl);
+      if (data.powerAutomateWebhookUrl) setPowerAutomateWebhookUrl(data.powerAutomateWebhookUrl);
+      if (data.resendToEmail) setResendToEmail(data.resendToEmail);
+      if (data.resendConfigured !== undefined) setServerResendConfigured(data.resendConfigured);
       if (data.configuredFilePath && !filePath) setFilePath(data.configuredFilePath);
     } catch (e) {
       console.warn('Could not load app status in modal:', e);
@@ -134,6 +146,39 @@ export default function ConfigModal({
     }
   };
 
+  const handleTestPowerAutomate = async () => {
+    if (!powerAutomateWebhookUrl) {
+      setPaTestResult({ success: false, message: 'Please enter a Power Automate Webhook URL first.' });
+      return;
+    }
+    setIsTestingPa(true);
+    setPaTestResult(null);
+    try {
+      const res = await testPowerAutomateWebhook(powerAutomateWebhookUrl);
+      setPaTestResult(res);
+    } catch (e) {
+      setPaTestResult({ success: false, message: e.message || 'Webhook test failed' });
+    } finally {
+      setIsTestingPa(false);
+    }
+  };
+
+  const handleTestResend = async () => {
+    setIsTestingResend(true);
+    setResendTestResult(null);
+    try {
+      const res = await testResendEmail('', resendToEmail);
+      setResendTestResult(res);
+      if (res.success) {
+        setServerResendConfigured(true);
+      }
+    } catch (e) {
+      setResendTestResult({ success: false, message: e.message || 'Resend test failed' });
+    } finally {
+      setIsTestingResend(false);
+    }
+  };
+
   const handleTestAdo = async () => {
     setAdoTestResult({ testing: true });
     try {
@@ -155,11 +200,13 @@ export default function ConfigModal({
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      // 1. Save Excel & SharePoint config
+      // 1. Save Excel, SharePoint, Power Automate & Resend config
       await saveAppConfig({
         filePath,
         currentUser: user,
-        sharePointUrl
+        sharePointUrl,
+        powerAutomateWebhookUrl,
+        resendToEmail
       });
 
       // 2. Save ADO config
@@ -355,6 +402,99 @@ export default function ConfigModal({
                   <div className={`test-feedback ${spTestResult.success ? 'success' : 'error'}`}>
                     {spTestResult.success ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
                     <span>{spTestResult.message}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="setting-field">
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <label htmlFor="config-powerautomate-url" style={{ fontWeight: 600 }}>
+                    ⚡ Power Automate Webhook (Direct Cloud Sync)
+                  </label>
+                  <span style={{ fontSize: '0.72rem', padding: '2px 8px', borderRadius: '12px', background: 'rgba(59, 130, 246, 0.15)', color: '#3b82f6', fontWeight: 600 }}>
+                    For Render / Phone / Cloud
+                  </span>
+                </div>
+                <p className="setting-help">
+                  Paste your Microsoft Power Automate flow HTTP POST URL. When provided, submissions from the deployed website or your phone update SharePoint directly via your Office 365 cloud flow!
+                </p>
+                <div className="input-with-action">
+                  <input 
+                    id="config-powerautomate-url"
+                    type="text" 
+                    className="styled-input"
+                    value={powerAutomateWebhookUrl}
+                    onChange={(e) => {
+                      setPowerAutomateWebhookUrl(e.target.value);
+                      setPaTestResult(null);
+                    }}
+                    placeholder="https://prod-XX.eastus.logic.azure.com:443/workflows/.../triggers/manual/paths/invoke?api-version=..."
+                  />
+                  <button 
+                    type="button" 
+                    className="btn-secondary test-btn"
+                    onClick={handleTestPowerAutomate}
+                    disabled={isTestingPa || !powerAutomateWebhookUrl}
+                  >
+                    {isTestingPa ? 'Testing...' : 'Test Webhook'}
+                  </button>
+                </div>
+                {paTestResult && (
+                  <div className={`test-feedback ${paTestResult.success ? 'success' : 'error'}`}>
+                    {paTestResult.success ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
+                    <span>{paTestResult.message}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="setting-field" style={{ border: '1px solid var(--border)', borderRadius: '8px', padding: '14px', background: 'var(--bg-card-hover, rgba(255,255,255,0.02))' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                  <label htmlFor="config-resend-to" style={{ fontWeight: 600 }}>
+                    ✉️ Cloud Email Sync (Resend API -&gt; Power Automate)
+                  </label>
+                  {serverResendConfigured ? (
+                    <span style={{ fontSize: '0.72rem', padding: '2px 8px', borderRadius: '12px', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', fontWeight: 600 }}>
+                      ✓ Active on Server
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: '0.72rem', padding: '2px 8px', borderRadius: '12px', background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', fontWeight: 600 }}>
+                      Server Key Not Set
+                    </span>
+                  )}
+                </div>
+                <p className="setting-help" style={{ marginBottom: '10px' }}>
+                  The Resend API key is stored securely as the <code>RESEND_API_KEY</code> environment variable on your server (e.g. Render). Submissions dispatch background emails to your Outlook to trigger the free Power Automate flow!
+                </p>
+
+                <div className="input-with-action" style={{ marginBottom: '8px' }}>
+                  <input 
+                    id="config-resend-to"
+                    type="email" 
+                    className="styled-input"
+                    value={resendToEmail}
+                    onChange={(e) => setResendToEmail(e.target.value)}
+                    placeholder="aravindhan.chandrasekaran@psiog.com"
+                  />
+                  <button 
+                    type="button" 
+                    className="btn-secondary test-btn"
+                    onClick={handleTestResend}
+                    disabled={isTestingResend}
+                  >
+                    {isTestingResend ? 'Sending Ping...' : 'Test Server Sync'}
+                  </button>
+                </div>
+
+                {!serverResendConfigured && (
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', padding: '6px 10px', background: 'rgba(245, 158, 11, 0.1)', borderLeft: '3px solid #f59e0b', borderRadius: '4px', marginTop: '6px' }}>
+                    💡 Set <code>RESEND_API_KEY</code> in Render dashboard (<strong>Environment</strong> tab) or in <code>application.properties</code> for local server.
+                  </div>
+                )}
+
+                {resendTestResult && (
+                  <div className={`test-feedback ${resendTestResult.success ? 'success' : 'error'}`} style={{ marginTop: '8px' }}>
+                    {resendTestResult.success ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
+                    <span>{resendTestResult.message}</span>
                   </div>
                 )}
               </div>

@@ -33,12 +33,26 @@ public class EodController {
     @Value("${eod.sharepoint.url:}")
     private String sharePointUrl;
 
+    @Value("${eod.powerautomate.webhook-url:}")
+    private String powerAutomateWebhookUrl;
+
     public EodController(ExcelService excelService,
                          SprintCalculationService sprintService,
                          ObjectMapper objectMapper) {
         this.excelService = excelService;
         this.sprintService = sprintService;
         this.objectMapper = objectMapper;
+    }
+
+    @jakarta.annotation.PostConstruct
+    public void init() {
+        if (this.sharePointUrl != null && !this.sharePointUrl.isBlank()) {
+            this.excelService.setSharePointUrl(this.sharePointUrl);
+            this.sharePointUrl = this.excelService.getSharePointUrl();
+        }
+        if (this.powerAutomateWebhookUrl != null && !this.powerAutomateWebhookUrl.isBlank()) {
+            this.excelService.setPowerAutomateWebhookUrl(this.powerAutomateWebhookUrl);
+        }
     }
 
     private String resolveEffectivePath(String requestedPath) {
@@ -76,7 +90,17 @@ public class EodController {
         resp.setActiveSprintName(sprintService.getCurrentSprintName());
         resp.setCurrentUser(defaultUser);
         resp.setSharePointUrl(sharePointUrl);
-        resp.setSharePointConnected(sharePointUrl != null && !sharePointUrl.isBlank());
+        resp.setPowerAutomateWebhookUrl(powerAutomateWebhookUrl);
+        boolean resendActive = excelService.getResendService() != null && excelService.getResendService().isConfigured();
+        resp.setResendConfigured(resendActive);
+        if (excelService.getResendService() != null) {
+            resp.setResendToEmail(excelService.getResendService().getToEmail());
+        }
+        resp.setSharePointConnected(
+                resendActive ||
+                (sharePointUrl != null && !sharePointUrl.isBlank()) ||
+                (powerAutomateWebhookUrl != null && !powerAutomateWebhookUrl.isBlank())
+        );
 
         try {
             resp.setSheets(excelService.getSheets(effectivePath));
@@ -145,8 +169,8 @@ public class EodController {
             @RequestParam(required = false) String url) {
         String effectivePath = resolveEffectivePath(path);
         if (url != null && !url.isBlank()) {
-            this.sharePointUrl = url.trim();
-            this.excelService.setSharePointUrl(this.sharePointUrl);
+            this.excelService.setSharePointUrl(url.trim());
+            this.sharePointUrl = this.excelService.getSharePointUrl();
         }
         Map<String, Object> resp = new HashMap<>();
         try {
@@ -239,15 +263,76 @@ public class EodController {
             this.defaultUser = body.get("currentUser").trim();
         }
         if (body.containsKey("sharePointUrl") && !body.get("sharePointUrl").isBlank()) {
-            this.sharePointUrl = body.get("sharePointUrl").trim();
-            this.excelService.setSharePointUrl(this.sharePointUrl);
+            this.excelService.setSharePointUrl(body.get("sharePointUrl").trim());
+            this.sharePointUrl = this.excelService.getSharePointUrl();
+        }
+        if (body.containsKey("powerAutomateWebhookUrl")) {
+            this.powerAutomateWebhookUrl = body.get("powerAutomateWebhookUrl") != null ? body.get("powerAutomateWebhookUrl").trim() : "";
+            this.excelService.setPowerAutomateWebhookUrl(this.powerAutomateWebhookUrl);
+        }
+        if (body.containsKey("resendApiKey") && !body.get("resendApiKey").isBlank()) {
+            this.excelService.getResendService().setApiKey(body.get("resendApiKey").trim());
+        }
+        if (body.containsKey("resendToEmail") && !body.get("resendToEmail").isBlank()) {
+            this.excelService.getResendService().setToEmail(body.get("resendToEmail").trim());
         }
         Map<String, String> resp = new HashMap<>();
         resp.put("filePath", this.defaultFilePath);
         resp.put("currentUser", this.defaultUser);
         resp.put("sharePointUrl", this.sharePointUrl);
+        resp.put("powerAutomateWebhookUrl", this.powerAutomateWebhookUrl);
+        resp.put("resendConfigured", String.valueOf(this.excelService.getResendService() != null && this.excelService.getResendService().isConfigured()));
+        resp.put("resendToEmail", this.excelService.getResendService() != null ? this.excelService.getResendService().getToEmail() : "");
         resp.put("message", "Configuration updated successfully");
         return ResponseEntity.ok(resp);
+    }
+
+    @PostMapping("/powerautomate/test")
+    public ResponseEntity<Map<String, Object>> testPowerAutomateWebhook(@RequestBody(required = false) Map<String, String> body) {
+        String webhookUrl = (body != null && body.containsKey("webhookUrl")) ? body.get("webhookUrl") : null;
+        if (webhookUrl == null || webhookUrl.isBlank()) {
+            webhookUrl = this.powerAutomateWebhookUrl;
+        }
+        Map<String, Object> resp = new HashMap<>();
+        if (webhookUrl == null || webhookUrl.isBlank()) {
+            resp.put("success", false);
+            resp.put("message", "Power Automate Webhook URL is empty");
+            return ResponseEntity.badRequest().body(resp);
+        }
+        try {
+            List<EodEntry> testEntries = Collections.singletonList(
+                    new EodEntry("10/26/2026", "Test Connection", "TEST-0", "Internal calls", 0.0, "Ping test from EOD Updater to verify Power Automate connection")
+            );
+            excelService.sendToPowerAutomateWebhook(webhookUrl, "TEST_PING", testEntries);
+            resp.put("success", true);
+            resp.put("message", "Power Automate webhook received the test payload successfully!");
+            return ResponseEntity.ok(resp);
+        } catch (Exception e) {
+            resp.put("success", false);
+            resp.put("message", "Webhook test failed: " + e.getMessage());
+            return ResponseEntity.ok(resp);
+        }
+    }
+
+    @PostMapping("/resend/test")
+    public ResponseEntity<Map<String, Object>> testResendEmail(@RequestBody(required = false) Map<String, String> body) {
+        String apiKey = (body != null && body.containsKey("apiKey")) ? body.get("apiKey") : null;
+        String toEmail = (body != null && body.containsKey("toEmail")) ? body.get("toEmail") : null;
+
+        Map<String, Object> resp = new HashMap<>();
+        try {
+            excelService.getResendService().sendTestEmail(apiKey, toEmail);
+            resp.put("success", true);
+            String recipient = (toEmail != null && !toEmail.isBlank())
+                    ? toEmail
+                    : (excelService.getResendService() != null ? excelService.getResendService().getToEmail() : "configured email");
+            resp.put("message", "Test email sent successfully via Resend to " + recipient + "! Check your Outlook inbox and Power Automate flow run history.");
+            return ResponseEntity.ok(resp);
+        } catch (Exception e) {
+            resp.put("success", false);
+            resp.put("message", "Resend test failed: " + e.getMessage());
+            return ResponseEntity.ok(resp);
+        }
     }
 
     @PostMapping("/compliance/missing-log-reason")

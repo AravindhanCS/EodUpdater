@@ -36,6 +36,7 @@ public class ExcelService {
 
     private final SprintCalculationService sprintService;
     private final ObjectMapper objectMapper;
+    private final ResendEmailSyncService resendService;
 
     @Value("${eod.sharepoint.enabled:true}")
     private boolean sharePointEnabled;
@@ -46,13 +47,24 @@ public class ExcelService {
     @Value("${eod.sharepoint.script-path:}")
     private String sharePointScriptPath;
 
+    @Value("${eod.powerautomate.webhook-url:}")
+    private String powerAutomateWebhookUrl;
+
     private static final String REASONS_FILE = "missing_log_reasons.json";
     private final Map<String, Map<String, String>> missingLogReasons = new java.util.concurrent.ConcurrentHashMap<>();
 
-    public ExcelService(SprintCalculationService sprintService, ObjectMapper objectMapper) {
+    public ExcelService(SprintCalculationService sprintService, ObjectMapper objectMapper, ResendEmailSyncService resendService) {
         this.sprintService = sprintService;
         this.objectMapper = objectMapper;
+        this.resendService = resendService;
         loadMissingLogReasons();
+    }
+
+    @jakarta.annotation.PostConstruct
+    public void init() {
+        if (this.sharePointUrl != null && !this.sharePointUrl.isBlank()) {
+            this.sharePointUrl = normalizeSharePointUrl(this.sharePointUrl);
+        }
     }
 
     public List<SheetInfo> getSheets(String filePath) throws IOException {
@@ -308,12 +320,39 @@ public class ExcelService {
                 ? "Successfully updated local file"
                 : "Local file is currently open in Excel/WPS";
 
-        if (sharePointEnabled && sharePointUrl != null && !sharePointUrl.isBlank()) {
+        // 1. First priority: Cloud Email Sync via Resend (Triggers Power Automate in the cloud without needing local PC)
+        if (resendService != null && resendService.isConfigured()) {
             try {
-                log.info("Triggering direct cloud sync to SharePoint Online: {}", sharePointUrl);
+                log.info("Dispatching EOD update email via Resend to {} for sheet {}", resendService.getToEmail(), targetSheetName);
+                resendService.sendEodUpdateEmail(targetSheetName, entries);
+                sharePointSynced = true;
+                message = "Successfully dispatched to SharePoint Online via Cloud Email Automation" + (localUpdated ? " and local copy!" : "!");
+            } catch (Exception e) {
+                log.error("Failed to dispatch email via Resend: {}", e.getMessage(), e);
+                message += " (Note: Resend email dispatch failed: " + e.getMessage() + ")";
+            }
+        } else if (powerAutomateWebhookUrl != null && !powerAutomateWebhookUrl.isBlank()) {
+            // 2. Second priority: Power Automate Webhook (Works anywhere: Cloud, Linux, Windows without desktop Excel)
+            try {
+                log.info("Triggering Power Automate cloud webhook to update SharePoint Online: {}", powerAutomateWebhookUrl);
+                sendToPowerAutomateWebhook(powerAutomateWebhookUrl, targetSheetName, entries);
+                sharePointSynced = true;
+                message = "Successfully updated SharePoint Online Effort Tracker via Power Automate" + (localUpdated ? " and local copy!" : "!");
+            } catch (Exception e) {
+                log.error("Failed to sync via Power Automate webhook: {}", e.getMessage(), e);
+                message += " (Note: Power Automate webhook sync failed: " + e.getMessage() + ")";
+            }
+        } else if (sharePointEnabled && sharePointUrl != null && !sharePointUrl.isBlank()) {
+            // 3. Third priority: Windows COM Excel desktop automation (requires local Windows host + Office)
+            try {
+                String effectiveUrl = normalizeSharePointUrl(sharePointUrl);
+                log.info("Triggering direct cloud sync to SharePoint Online via Windows COM: {}", effectiveUrl);
                 syncToSharePoint(targetSheetName, entries);
                 sharePointSynced = true;
                 message = "Successfully updated SharePoint Online Effort Tracker" + (localUpdated ? " and local copy!" : "!");
+            } catch (UnsupportedOperationException uoe) {
+                log.warn("SharePoint sync skipped (cloud host): {}", uoe.getMessage());
+                message = "Saved to local file only. (For cloud sync from Render/Linux, configure Resend API Key in Settings)";
             } catch (Exception e) {
                 log.error("Failed to sync directly to SharePoint: {}", e.getMessage(), e);
                 message += " (Note: SharePoint sync failed: " + e.getMessage() + ")";
@@ -335,10 +374,11 @@ public class ExcelService {
     public void syncToSharePoint(String targetSheetName, List<EodEntry> entries) throws IOException, InterruptedException {
         String os = System.getProperty("os.name", "").toLowerCase();
         if (!os.contains("win")) {
-            log.info("Skipping SharePoint desktop COM sync: running on non-Windows cloud environment ({})", os);
-            return;
+            log.warn("Skipping SharePoint desktop COM sync: running on non-Windows cloud environment ({})", os);
+            throw new UnsupportedOperationException("SharePoint direct sync requires a Windows host with corporate SSO credentials.");
         }
 
+        String effectiveUrl = normalizeSharePointUrl(sharePointUrl);
         File tempJson = File.createTempFile("eod_entries_", ".json");
         try {
             objectMapper.writeValue(tempJson, entries);
@@ -352,7 +392,7 @@ public class ExcelService {
                     "-File", scriptPath,
                     "-JsonFile", tempJson.getAbsolutePath(),
                     "-TargetSheet", targetSheetName,
-                    "-SharePointUrl", sharePointUrl
+                    "-SharePointUrl", effectiveUrl
             );
             pb.redirectErrorStream(true);
             Process process = pb.start();
@@ -374,12 +414,73 @@ public class ExcelService {
         }
     }
 
+    public String normalizeSharePointUrl(String url) {
+        if (url == null || url.isBlank()) return url;
+        String trimmed = url.trim();
+        if (trimmed.contains("/:x:/") || trimmed.contains("/:f:/") || trimmed.contains("guestaccess")) {
+            java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("https://([^/]+)/:[a-z]:/[a-z]/personal/([^/]+)/");
+            java.util.regex.Matcher matcher = pattern.matcher(trimmed);
+            if (matcher.find()) {
+                String domain = matcher.group(1);
+                String userFolder = matcher.group(2);
+                return "https://" + domain + "/personal/" + userFolder + "/Documents/Effort%20Tracker%20-%20Simplicity.xlsx";
+            }
+        }
+        return trimmed;
+    }
+
     public String getSharePointUrl() {
         return sharePointUrl;
     }
 
     public void setSharePointUrl(String sharePointUrl) {
-        this.sharePointUrl = sharePointUrl;
+        this.sharePointUrl = normalizeSharePointUrl(sharePointUrl);
+    }
+
+    public String getPowerAutomateWebhookUrl() {
+        return powerAutomateWebhookUrl;
+    }
+
+    public void setPowerAutomateWebhookUrl(String powerAutomateWebhookUrl) {
+        this.powerAutomateWebhookUrl = (powerAutomateWebhookUrl != null) ? powerAutomateWebhookUrl.trim() : null;
+    }
+
+    public void sendToPowerAutomateWebhook(String webhookUrl, String targetSheetName, List<EodEntry> entries) throws IOException, InterruptedException {
+        if (webhookUrl == null || webhookUrl.isBlank()) {
+            throw new IllegalArgumentException("Power Automate Webhook URL cannot be empty");
+        }
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("sheetName", targetSheetName);
+        payload.put("entries", entries);
+        payload.put("submittedAt", java.time.Instant.now().toString());
+
+        String jsonBody = objectMapper.writeValueAsString(payload);
+
+        HttpClient client = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(15))
+                .build();
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(webhookUrl.trim()))
+                .header("Content-Type", "application/json")
+                .timeout(Duration.ofSeconds(45))
+                .POST(HttpRequest.BodyPublishers.ofString(jsonBody, StandardCharsets.UTF_8))
+                .build();
+
+        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        int status = response.statusCode();
+
+        if (status < 200 || status >= 300) {
+            log.error("Power Automate webhook returned HTTP {}: {}", status, response.body());
+            throw new IOException("Power Automate webhook returned HTTP " + status + ": " + response.body());
+        }
+
+        log.info("Successfully dispatched EOD entries to Power Automate webhook (HTTP {}): {}", status, response.body());
+    }
+
+    public ResendEmailSyncService getResendService() {
+        return resendService;
     }
 
     public byte[] downloadFromSharePoint(String urlString) throws IOException, InterruptedException {

@@ -12,6 +12,9 @@ public class AppStatusResponse {
     private String currentUser;
     private boolean sharePointConnected;
     private String sharePointUrl;
+    private String powerAutomateWebhookUrl;
+    private boolean resendConfigured;
+    private String resendToEmail;
 
     public AppStatusResponse() {
     }
@@ -86,5 +89,29 @@ public class AppStatusResponse {
 
     public void setSharePointUrl(String sharePointUrl) {
         this.sharePointUrl = sharePointUrl;
+    }
+
+    public String getPowerAutomateWebhookUrl() {
+        return powerAutomateWebhookUrl;
+    }
+
+    public void setPowerAutomateWebhookUrl(String powerAutomateWebhookUrl) {
+        this.powerAutomateWebhookUrl = powerAutomateWebhookUrl;
+    }
+
+    public boolean isResendConfigured() {
+        return resendConfigured;
+    }
+
+    public void setResendConfigured(boolean resendConfigured) {
+        this.resendConfigured = resendConfigured;
+    }
+
+    public String getResendToEmail() {
+        return resendToEmail;
+    }
+
+    public void setResendToEmail(String resendToEmail) {
+        this.resendToEmail = resendToEmail;
     }
 }

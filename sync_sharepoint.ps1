@@ -11,6 +11,13 @@ if (-not (Test-Path $JsonFile)) {
     exit 1
 }
 
+# Auto-normalize personal sharing link to direct document library URL
+if ($SharePointUrl -match "personal/([^/]+)/" -and ($SharePointUrl -like "*:x:*" -or $SharePointUrl -like "*:f:*" -or $SharePointUrl -like "*guestaccess*")) {
+    $personalUser = $matches[1]
+    $SharePointUrl = "https://psiog0-my.sharepoint.com/personal/$personalUser/Documents/Effort%20Tracker%20-%20Simplicity.xlsx"
+    Write-Host "Auto-normalized sharing link to direct document URL: $SharePointUrl"
+}
+
 $rawJson = Get-Content -Path $JsonFile -Raw -Encoding UTF8
 $entries = $rawJson | ConvertFrom-Json
 

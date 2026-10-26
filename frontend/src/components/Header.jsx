@@ -110,9 +110,12 @@ export default function Header({
         </div>
 
         {status?.sharePointConnected && (
-          <div className="status-pill sharepoint-live-pill" title={`Live SharePoint sync active: ${status.sharePointUrl}`}>
+          <div 
+            className="status-pill sharepoint-live-pill" 
+            title={`Live SharePoint sync active: ${status.resendConfigured ? 'Resend Cloud Email Sync' : status.powerAutomateWebhookUrl ? 'Power Automate Cloud Webhook' : status.sharePointUrl}`}
+          >
             <span className="status-dot blue-pulse"></span>
-            <span className="status-text">SharePoint Live</span>
+            <span className="status-text">{status.resendConfigured ? 'Cloud Sync Live' : status.powerAutomateWebhookUrl ? 'Cloud Sync Live' : 'SharePoint Live'}</span>
           </div>
         )}
 

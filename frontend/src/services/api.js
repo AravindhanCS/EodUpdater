@@ -49,6 +49,32 @@ export async function pullLatestFromSharePoint(path = '', sharePointUrl = '') {
   return data;
 }
 
+export async function testPowerAutomateWebhook(webhookUrl = '') {
+  const res = await fetch(`${API_BASE}/powerautomate/test`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ webhookUrl })
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.message || 'Power Automate test failed');
+  }
+  return data;
+}
+
+export async function testResendEmail(apiKey = '', toEmail = '') {
+  const res = await fetch(`${API_BASE}/resend/test`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ apiKey, toEmail })
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.message || 'Resend test failed');
+  }
+  return data;
+}
+
 export async function uploadTrackerFile(file) {
   const formData = new FormData();
   formData.append('file', file);

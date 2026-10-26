@@ -138,10 +138,17 @@ export default function App() {
           entries
         });
         triggerCelebration();
-        showToast(
-          `Successfully added ${res.rowsAdded} task(s) totaling ${res.totalHoursAdded}h to sheet ${res.sheetName}!`,
-          'success'
-        );
+        if (res.sharePointSynced) {
+          showToast(
+            `Successfully added ${res.rowsAdded} task(s) totaling ${res.totalHoursAdded}h to SharePoint Online and local copy!`,
+            'success'
+          );
+        } else {
+          showToast(
+            res.message || `Saved to local file (${res.rowsAdded} task(s)), but SharePoint sync was skipped.`,
+            'warning'
+          );
+        }
         loadAppStatus();
       } else {
         // Upload & Download mode
