@@ -63,7 +63,7 @@ public class ExcelService {
     @jakarta.annotation.PostConstruct
     public void init() {
         if (this.sharePointUrl != null && !this.sharePointUrl.isBlank()) {
-            this.sharePointUrl = normalizeSharePointUrl(this.sharePointUrl);
+            this.sharePointUrl = this.sharePointUrl.trim();
         }
     }
 
@@ -434,7 +434,7 @@ public class ExcelService {
     }
 
     public void setSharePointUrl(String sharePointUrl) {
-        this.sharePointUrl = normalizeSharePointUrl(sharePointUrl);
+        this.sharePointUrl = (sharePointUrl != null) ? sharePointUrl.trim() : null;
     }
 
     public String getPowerAutomateWebhookUrl() {
