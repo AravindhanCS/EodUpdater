@@ -17,7 +17,7 @@ export default function SyncStatusModal({
   const totalHrs = entries.reduce((sum, e) => sum + (parseFloat(e.timeInHrs) || 0), 0);
 
   return (
-    <div className="modal-backdrop animate-fade-in" onClick={onClose}>
+    <div className="modal-overlay animate-fade-in" onClick={onClose}>
       <div 
         className="modal-content sync-status-modal glass-panel animate-scale-in"
         onClick={(e) => e.stopPropagation()}

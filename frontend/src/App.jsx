@@ -47,7 +47,7 @@ function detectLatestSprint(sheets, fallback = '2.14.11.0') {
   return list[0];
 }
 
-const VERIFICATION_MAX_SECONDS = 75;
+const VERIFICATION_MAX_SECONDS = 50;
 
 export default function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem('eod_theme') || 'dark');
@@ -161,6 +161,7 @@ export default function App() {
           entries: submittedEntries,
           elapsedSeconds: elapsed
         });
+        showToast('SharePoint verification timed out. Microsoft Power Automate flow may have failed or is still queued.', 'warning');
       }
     }, 1000);
 

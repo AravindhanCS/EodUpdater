@@ -21,7 +21,7 @@ export default function RecentEntriesTable({
   onRefresh,
   isVerifying = false,
   verificationSeconds = 0,
-  verificationMaxSeconds = 75,
+  verificationMaxSeconds = 50,
   pendingEntries = []
 }) {
   const [filterUserOnly, setFilterUserOnly] = useState(false);
