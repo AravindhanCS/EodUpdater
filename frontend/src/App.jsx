@@ -172,13 +172,8 @@ export default function App() {
           stopSharePointVerification();
           setRecentEntries(fetched);
           triggerCelebration();
-          setSyncModalState({
-            isOpen: true,
-            type: 'success',
-            sheetName,
-            entries: submittedEntries,
-            elapsedSeconds: elapsed
-          });
+          setSyncModalState(prev => ({ ...prev, isOpen: false }));
+          showToast(`Successfully synced with SharePoint Online! ${submittedEntries.length} task(s) confirmed in sheet "${sheetName}".`, 'success');
         }
       } catch (err) {
         console.warn('SharePoint verification poll warning:', err);
@@ -198,10 +193,8 @@ export default function App() {
       if (checkEntriesMatchInSharePoint(fetched, syncModalState.entries)) {
         setRecentEntries(fetched);
         triggerCelebration();
-        setSyncModalState(prev => ({
-          ...prev,
-          type: 'success'
-        }));
+        setSyncModalState(prev => ({ ...prev, isOpen: false }));
+        showToast(`Successfully synced with SharePoint Online! Entries verified in sheet "${effectiveSheet}".`, 'success');
       } else {
         showToast('Submitted tasks are still in Power Automate queue. Please allow 30 more seconds and check again.', 'warning');
       }
@@ -469,6 +462,7 @@ export default function App() {
         sheetName={syncModalState.sheetName}
         entries={syncModalState.entries}
         elapsedSeconds={syncModalState.elapsedSeconds}
+        sharePointUrl={status?.sharePointUrl}
         onClose={() => setSyncModalState(prev => ({ ...prev, isOpen: false }))}
         onRetryCheck={handleRetryCheck}
         isRetrying={isRetryingVerification}

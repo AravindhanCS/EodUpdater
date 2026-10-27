@@ -1,12 +1,22 @@
 import React from 'react';
-import { CheckCircle2, AlertTriangle, RefreshCw, X, ShieldCheck, ArrowRight, ExternalLink } from 'lucide-react';
+import { 
+  CheckCircle2, 
+  AlertTriangle, 
+  RefreshCw, 
+  X, 
+  ShieldCheck, 
+  ArrowRight, 
+  ExternalLink,
+  FileSpreadsheet
+} from 'lucide-react';
 
 export default function SyncStatusModal({
   isOpen,
-  type = 'success', // 'success' | 'timeout'
+  type = 'timeout', // 'timeout' | 'success'
   sheetName = '',
   entries = [],
   elapsedSeconds = 0,
+  sharePointUrl = '',
   onClose,
   onRetryCheck,
   isRetrying = false
@@ -15,6 +25,15 @@ export default function SyncStatusModal({
 
   const isSuccess = type === 'success';
   const totalHrs = entries.reduce((sum, e) => sum + (parseFloat(e.timeInHrs) || 0), 0);
+
+  const defaultSharePointUrl = 'https://psiog0-my.sharepoint.com/:x:/g/personal/abinayasundari_paramasivam_psiog_com/IQCajkhcEzfESIEMXT6hpb0NAY5Z6-iujcXYrEnq0Z27shA?e=yvkpjj';
+  const targetUrl = (sharePointUrl && sharePointUrl.trim().length > 0) ? sharePointUrl.trim() : defaultSharePointUrl;
+
+  const handleOpenExcel = () => {
+    // Open in Excel Online (strip any download=1 query)
+    const cleanUrl = targetUrl.replace(/([?&])download=1/, '');
+    window.open(cleanUrl, '_blank', 'noopener,noreferrer');
+  };
 
   return (
     <div className="modal-overlay animate-fade-in" onClick={onClose}>
@@ -94,11 +113,36 @@ export default function SyncStatusModal({
             </div>
           ) : (
             <div className="sync-timeout-content">
+              {/* Option to Open Excel directly */}
+              <div className="open-excel-action-card">
+                <div className="open-excel-info">
+                  <div className="excel-icon-pill">
+                    <FileSpreadsheet size={22} className="excel-brand-icon" />
+                  </div>
+                  <div>
+                    <h4>Update Directly in SharePoint Excel</h4>
+                    <p>
+                      If Microsoft Power Automate is delayed or encountered an error, you can open the live Excel spreadsheet directly and record your entries.
+                    </p>
+                  </div>
+                </div>
+                <button 
+                  type="button" 
+                  className="open-excel-direct-btn"
+                  onClick={handleOpenExcel}
+                  title="Open live SharePoint Excel workbook in Excel Online"
+                >
+                  <FileSpreadsheet size={16} />
+                  <span>Open Excel Sheet</span>
+                  <ExternalLink size={14} />
+                </button>
+              </div>
+
               <div className="timeout-notice-box">
                 <h4>What does this mean?</h4>
                 <p>
-                  Your update was successfully dispatched to Cloud Automation via Resend email. 
-                  However, Microsoft Power Automate is either still processing in the Outlook queue or running its Office Script in SharePoint Online.
+                  Your update was dispatched to Cloud Automation via Resend email. 
+                  However, Microsoft Power Automate has not yet updated sheet <strong>{sheetName}</strong> in SharePoint.
                 </p>
               </div>
 
@@ -106,13 +150,13 @@ export default function SyncStatusModal({
                 <h5>Helpful Information:</h5>
                 <ul>
                   <li>
+                    <strong>Check Power Automate Run History</strong>: In make.powerautomate.com, verify if the "EOD Tracker Sync" flow ran or failed (e.g. linter error or script parameter issue).
+                  </li>
+                  <li>
                     <strong>Outlook Delivery Lag</strong>: Cloud emails occasionally take 30–90 seconds to trigger Power Automate during high Microsoft 365 traffic.
                   </li>
                   <li>
-                    <strong>No Data Lost</strong>: Your entries remain safely queued. They will appear as soon as the Power Automate flow completes.
-                  </li>
-                  <li>
-                    <strong>Check Flow Run History</strong>: If entries do not appear after 2 minutes, visit Power Automate to verify your flow run.
+                    <strong>No Data Lost</strong>: Your entries remain saved in your input form. You can retry the check below or open Excel directly.
                   </li>
                 </ul>
               </div>
@@ -148,11 +192,23 @@ export default function SyncStatusModal({
             <>
               <button 
                 type="button" 
+                className="btn-excel-footer"
+                onClick={handleOpenExcel}
+                title="Open live SharePoint Excel workbook in a new tab"
+              >
+                <FileSpreadsheet size={15} />
+                <span>Open Excel Sheet</span>
+                <ExternalLink size={13} />
+              </button>
+
+              <button 
+                type="button" 
                 className="btn-secondary"
                 onClick={onClose}
               >
                 Dismiss
               </button>
+
               <button 
                 type="button" 
                 className={`btn-primary ${isRetrying ? 'loading' : ''}`}
