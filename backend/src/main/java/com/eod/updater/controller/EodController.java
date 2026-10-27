@@ -49,6 +49,13 @@ public class EodController {
         if (this.sharePointUrl != null && !this.sharePointUrl.isBlank()) {
             this.excelService.setSharePointUrl(this.sharePointUrl);
             this.sharePointUrl = this.excelService.getSharePointUrl();
+            // Automatically pull latest live workbook from SharePoint in background on boot
+            new Thread(() -> {
+                try {
+                    String path = resolveEffectivePath(null);
+                    excelService.syncFromSharePointIfStale(path, 0);
+                } catch (Exception ignored) {}
+            }, "SharePoint-Startup-Sync").start();
         }
         if (this.powerAutomateWebhookUrl != null && !this.powerAutomateWebhookUrl.isBlank()) {
             this.excelService.setPowerAutomateWebhookUrl(this.powerAutomateWebhookUrl);
@@ -80,8 +87,16 @@ public class EodController {
     }
 
     @GetMapping("/status")
-    public ResponseEntity<AppStatusResponse> getStatus(@RequestParam(required = false) String path) {
+    public ResponseEntity<AppStatusResponse> getStatus(
+            @RequestParam(required = false) String path,
+            @RequestParam(defaultValue = "true") boolean syncSharePoint) {
         String effectivePath = resolveEffectivePath(path);
+
+        // Auto-sync from SharePoint if stale (>20 seconds) or requested so user never needs to click "Sync Now" manually
+        if (syncSharePoint) {
+            excelService.syncFromSharePointIfStale(effectivePath, 20000);
+        }
+
         File file = new File(effectivePath);
 
         AppStatusResponse resp = new AppStatusResponse();

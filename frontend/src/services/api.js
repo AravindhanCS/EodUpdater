@@ -1,8 +1,11 @@
 const BACKEND_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080').replace(/\/+$/, '');
 const API_BASE = `${BACKEND_URL}/api/eod`;
 
-export async function fetchStatus(path = '') {
-  const url = path ? `${API_BASE}/status?path=${encodeURIComponent(path)}` : `${API_BASE}/status`;
+export async function fetchStatus(path = '', syncSharePoint = true) {
+  const params = new URLSearchParams();
+  if (path) params.append('path', path);
+  if (syncSharePoint) params.append('syncSharePoint', 'true');
+  const url = `${API_BASE}/status${params.toString() ? `?${params.toString()}` : ''}`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Status check failed: ${res.statusText}`);
   return res.json();

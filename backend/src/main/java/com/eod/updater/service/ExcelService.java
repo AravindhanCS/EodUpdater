@@ -70,7 +70,32 @@ public class ExcelService {
         }
     }
 
+    /**
+     * Automatically downloads the latest workbook from SharePoint Online if the local copy is older than maxAgeMs.
+     * Keeps the local file completely up-to-date with zero manual action required from the user.
+     */
+    public synchronized boolean syncFromSharePointIfStale(String filePath, long maxAgeMs) {
+        if (sharePointUrl == null || sharePointUrl.isBlank()) {
+            return false;
+        }
+        long now = System.currentTimeMillis();
+        if (maxAgeMs > 0 && (now - lastSharePointPullTime < maxAgeMs)) {
+            return true; // Cache is warm
+        }
+        try {
+            log.info("Auto-syncing Effort Tracker directly from live SharePoint Online (maxAgeMs={})...", maxAgeMs);
+            pullLatestFromSharePoint(filePath);
+            lastSharePointPullTime = System.currentTimeMillis();
+            return true;
+        } catch (Exception e) {
+            log.warn("Auto-sync from SharePoint skipped or failed ({}). Using existing local file.", e.getMessage());
+            return false;
+        }
+    }
+
     public List<SheetInfo> getSheets(String filePath) throws IOException {
+        syncFromSharePointIfStale(filePath, SHAREPOINT_PULL_INTERVAL_MS);
+
         File file = new File(filePath);
         if (!file.exists()) {
             return Collections.emptyList();
@@ -165,19 +190,8 @@ public class ExcelService {
     }
 
     public List<EodEntry> getRecentEntries(String filePath, String sheetName, int limit, boolean forceRefresh) throws IOException {
-        // If sharePointUrl is configured, ensure local file is kept strictly in sync with SharePoint Online!
-        if (sharePointUrl != null && !sharePointUrl.isBlank()) {
-            boolean shouldPull = forceRefresh || (System.currentTimeMillis() - lastSharePointPullTime > SHAREPOINT_PULL_INTERVAL_MS);
-            if (shouldPull) {
-                try {
-                    log.info("Auto-syncing Recent Entries directly from live SharePoint Online (forceRefresh={})...", forceRefresh);
-                    pullLatestFromSharePoint(filePath);
-                    lastSharePointPullTime = System.currentTimeMillis();
-                } catch (Exception e) {
-                    log.warn("Failed to auto-sync from SharePoint before reading recent entries: {}", e.getMessage());
-                }
-            }
-        }
+        // Automatically sync from SharePoint if stale or forced refresh requested
+        syncFromSharePointIfStale(filePath, forceRefresh ? 0 : SHAREPOINT_PULL_INTERVAL_MS);
 
         File file = new File(filePath);
         if (!file.exists()) {
