@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import confetti from 'canvas-confetti';
 import { 
   CheckCircle, 
@@ -18,6 +18,7 @@ import RecentEntriesTable from './components/RecentEntriesTable';
 import FileUploadSection from './components/FileUploadSection';
 import ConfigModal from './components/ConfigModal';
 import DashboardView from './components/DashboardView';
+import SyncStatusModal from './components/SyncStatusModal';
 
 import { 
   fetchStatus, 
@@ -46,6 +47,8 @@ function detectLatestSprint(sheets, fallback = '2.14.11.0') {
   return list[0];
 }
 
+const VERIFICATION_MAX_SECONDS = 75;
+
 export default function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem('eod_theme') || 'dark');
   const [activeTab, setActiveTab] = useState('logger'); // 'logger' | 'dashboard'
@@ -66,6 +69,22 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [toast, setToast] = useState(null);
 
+  // Live SharePoint Online Verification States
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verificationSeconds, setVerificationSeconds] = useState(0);
+  const [pendingVerificationEntries, setPendingVerificationEntries] = useState([]);
+  const [syncModalState, setSyncModalState] = useState({
+    isOpen: false,
+    type: 'success', // 'success' | 'timeout'
+    sheetName: '',
+    entries: [],
+    elapsedSeconds: 0
+  });
+  const [isRetryingVerification, setIsRetryingVerification] = useState(false);
+
+  const verificationPollRef = useRef(null);
+  const verificationTimerRef = useRef(null);
+
   // Apply theme to HTML
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -83,6 +102,114 @@ export default function App() {
       loadRecentEntries(targetSheet);
     }
   }, [targetSheet]);
+
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      stopSharePointVerification();
+    };
+  }, []);
+
+  const stopSharePointVerification = () => {
+    if (verificationPollRef.current) {
+      clearInterval(verificationPollRef.current);
+      verificationPollRef.current = null;
+    }
+    if (verificationTimerRef.current) {
+      clearInterval(verificationTimerRef.current);
+      verificationTimerRef.current = null;
+    }
+    setIsVerifying(false);
+  };
+
+  const checkEntriesMatchInSharePoint = (fetchedEntries, submittedEntries) => {
+    if (!submittedEntries || submittedEntries.length === 0) return true;
+    if (!fetchedEntries || fetchedEntries.length === 0) return false;
+
+    return submittedEntries.every(sub => {
+      return fetchedEntries.some(item => {
+        const userMatch = item.name && sub.name && item.name.trim().toLowerCase() === sub.name.trim().toLowerCase();
+        const catMatch = item.category && sub.category && item.category.trim().toLowerCase() === sub.category.trim().toLowerCase();
+        const subTicket = (sub.ticket || '').trim().toLowerCase();
+        const itemTicket = (item.ticket || '').trim().toLowerCase();
+        const ticketMatch = (!subTicket && !itemTicket) || (subTicket === itemTicket);
+        const subHrs = parseFloat(sub.timeInHrs) || 0;
+        const itemHrs = parseFloat(item.timeInHrs) || 0;
+        const hrsMatch = Math.abs(subHrs - itemHrs) < 0.05;
+        return userMatch && catMatch && ticketMatch && hrsMatch;
+      });
+    });
+  };
+
+  const startSharePointVerification = (sheetName, submittedEntries) => {
+    stopSharePointVerification();
+    setIsVerifying(true);
+    setVerificationSeconds(0);
+    setPendingVerificationEntries(submittedEntries);
+
+    let elapsed = 0;
+    verificationTimerRef.current = setInterval(() => {
+      elapsed += 1;
+      setVerificationSeconds(elapsed);
+
+      if (elapsed >= VERIFICATION_MAX_SECONDS) {
+        stopSharePointVerification();
+        setSyncModalState({
+          isOpen: true,
+          type: 'timeout',
+          sheetName,
+          entries: submittedEntries,
+          elapsedSeconds: elapsed
+        });
+      }
+    }, 1000);
+
+    const runPoll = async () => {
+      try {
+        const fetched = await fetchRecentEntries(sheetName, status?.configuredFilePath, 50, true);
+        if (checkEntriesMatchInSharePoint(fetched, submittedEntries)) {
+          stopSharePointVerification();
+          setRecentEntries(fetched);
+          triggerCelebration();
+          setSyncModalState({
+            isOpen: true,
+            type: 'success',
+            sheetName,
+            entries: submittedEntries,
+            elapsedSeconds: elapsed
+          });
+        }
+      } catch (err) {
+        console.warn('SharePoint verification poll warning:', err);
+      }
+    };
+
+    // Poll every 4.5 seconds and an initial poll after 3.5 seconds
+    verificationPollRef.current = setInterval(runPoll, 4500);
+    setTimeout(runPoll, 3500);
+  };
+
+  const handleRetryCheck = async () => {
+    setIsRetryingVerification(true);
+    try {
+      const effectiveSheet = syncModalState.sheetName || targetSheet;
+      const fetched = await fetchRecentEntries(effectiveSheet, status?.configuredFilePath, 50, true);
+      if (checkEntriesMatchInSharePoint(fetched, syncModalState.entries)) {
+        setRecentEntries(fetched);
+        triggerCelebration();
+        setSyncModalState(prev => ({
+          ...prev,
+          type: 'success'
+        }));
+      } else {
+        showToast('Submitted tasks are still in Power Automate queue. Please allow 30 more seconds and check again.', 'warning');
+      }
+    } catch (e) {
+      showToast('Could not query SharePoint: ' + e.message, 'error');
+    } finally {
+      setIsRetryingVerification(false);
+    }
+  };
 
   const loadAppStatus = async (customPath = '') => {
     try {
@@ -158,22 +285,21 @@ export default function App() {
           createSheetIfMissing,
           entries
         });
-        triggerCelebration();
+
         if (res.sharePointSynced) {
           showToast(
             res.message || `Dispatched ${res.rowsAdded} task(s) totaling ${res.totalHoursAdded}h to SharePoint Online via Cloud Automation!`,
             'success'
           );
-          // Auto-sync after Power Automate has processed in the cloud
-          setTimeout(() => {
-            loadRecentEntries(sheetName, status?.configuredFilePath, true);
-          }, 10000);
+          // Launch the live SharePoint Online verification loop!
+          startSharePointVerification(sheetName, entries);
         } else {
           showToast(
             res.message || `Saved to local file (${res.rowsAdded} task(s)), but SharePoint sync was skipped.`,
             'warning'
           );
           loadRecentEntries(sheetName, status?.configuredFilePath, false);
+          triggerCelebration();
         }
         loadAppStatus();
       } else {
@@ -196,9 +322,6 @@ export default function App() {
 
   // Compute stats for current sprint
   const sprintRows = recentEntries.length;
-  const myTodayHours = recentEntries
-    .filter(e => e.name.toLowerCase() === currentUser.toLowerCase() && e.date.includes('2026'))
-    .reduce((sum, e) => sum + (parseFloat(e.timeInHrs) || 0), 0);
 
   return (
     <div className="app-container">
@@ -318,6 +441,10 @@ export default function App() {
                 targetSheet={targetSheet}
                 isLoading={isLoadingEntries}
                 onRefresh={(force) => loadRecentEntries(targetSheet, status?.configuredFilePath, force ?? true)}
+                isVerifying={isVerifying}
+                verificationSeconds={verificationSeconds}
+                verificationMaxSeconds={VERIFICATION_MAX_SECONDS}
+                pendingEntries={pendingVerificationEntries}
               />
             </section>
           </>
@@ -332,6 +459,18 @@ export default function App() {
         currentUser={currentUser}
         teamMembers={teamMembers}
         onConfigSaved={handleConfigSaved}
+      />
+
+      {/* Live SharePoint Cloud Sync Status / Timeout Modal */}
+      <SyncStatusModal 
+        isOpen={syncModalState.isOpen}
+        type={syncModalState.type}
+        sheetName={syncModalState.sheetName}
+        entries={syncModalState.entries}
+        elapsedSeconds={syncModalState.elapsedSeconds}
+        onClose={() => setSyncModalState(prev => ({ ...prev, isOpen: false }))}
+        onRetryCheck={handleRetryCheck}
+        isRetrying={isRetryingVerification}
       />
     </div>
   );

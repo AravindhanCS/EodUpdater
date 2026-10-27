@@ -83,6 +83,11 @@ public class ResendEmailSyncService {
         sendEodUpdateEmail(this.apiKey, this.toEmail, targetSheetName, entries);
     }
 
+    private String cleanText(String s) {
+        if (s == null) return "";
+        return s.replaceAll("[\\r\\n]+", " ").replaceAll("\\s+", " ").trim();
+    }
+
     public void sendEodUpdateEmail(String activeApiKey, String targetRecipient, String targetSheetName, List<EodEntry> entries) throws IOException, InterruptedException {
         if (activeApiKey == null || activeApiKey.isBlank()) {
             throw new IllegalStateException("Resend API key is not configured. Please set the RESEND_API_KEY environment variable on your server (e.g. Render Dashboard -> Environment) or in application.properties.");
@@ -91,9 +96,21 @@ public class ResendEmailSyncService {
             throw new IllegalArgumentException("Target recipient email cannot be empty.");
         }
 
+        // Sanitize all entries to remove any accidental newlines or extra whitespace
+        List<EodEntry> cleanEntries = (entries != null)
+                ? entries.stream().map(e -> new EodEntry(
+                        cleanText(e.getDate()),
+                        cleanText(e.getName()),
+                        cleanText(e.getTicket()),
+                        cleanText(e.getCategory()),
+                        e.getTimeInHrs(),
+                        cleanText(e.getDescription())
+                )).collect(java.util.stream.Collectors.toList())
+                : Collections.emptyList();
+
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("sheetName", targetSheetName);
-        payload.put("entries", entries);
+        payload.put("sheetName", cleanText(targetSheetName));
+        payload.put("entries", cleanEntries);
 
         String jsonText = objectMapper.writeValueAsString(payload);
 
@@ -102,6 +119,7 @@ public class ResendEmailSyncService {
         resendRequest.put("to", Collections.singletonList(targetRecipient.trim()));
         resendRequest.put("subject", this.subject != null && !this.subject.isBlank() ? this.subject : "[EOD-UPDATE]");
         resendRequest.put("text", jsonText);
+        resendRequest.put("html", "<pre style=\"white-space:pre-wrap;font-family:monospace;\">" + jsonText + "</pre>");
 
         String requestBody = objectMapper.writeValueAsString(resendRequest);
 

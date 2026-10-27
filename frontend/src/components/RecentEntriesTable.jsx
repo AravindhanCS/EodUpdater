@@ -1,18 +1,34 @@
 import React, { useState } from 'react';
-import { RefreshCw, Search, Filter, History, User, Tag, Calendar, Clock, CheckCircle2 } from 'lucide-react';
+import { 
+  Cloud, 
+  Search, 
+  History, 
+  User, 
+  Clock, 
+  CheckCircle2, 
+  Sparkles, 
+  RefreshCw,
+  Layers,
+  ShieldCheck,
+  AlertCircle
+} from 'lucide-react';
 
 export default function RecentEntriesTable({
   entries = [],
-  currentUser,
-  targetSheet,
-  isLoading,
-  onRefresh
+  currentUser = '',
+  targetSheet = '',
+  isLoading = false,
+  onRefresh,
+  isVerifying = false,
+  verificationSeconds = 0,
+  verificationMaxSeconds = 75,
+  pendingEntries = []
 }) {
   const [filterUserOnly, setFilterUserOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   const filteredEntries = entries.filter(e => {
-    if (filterUserOnly && e.name.toLowerCase() !== currentUser.toLowerCase()) {
+    if (filterUserOnly && e.name && currentUser && e.name.toLowerCase() !== currentUser.toLowerCase()) {
       return false;
     }
     if (searchQuery.trim()) {
@@ -38,6 +54,11 @@ export default function RecentEntriesTable({
     }
   };
 
+  const progressPercent = Math.min(
+    100, 
+    Math.max(6, Math.round((verificationSeconds / verificationMaxSeconds) * 100))
+  );
+
   return (
     <div className="recent-entries-card glass-panel">
       {/* Header with Title and Controls */}
@@ -47,9 +68,15 @@ export default function RecentEntriesTable({
           <div>
             <div className="entries-title-line">
               <h2 className="entries-title">Recent Sprint Entries</h2>
-              <span className="live-sharepoint-badge" title="Showing only entries present and verified in SharePoint Online">
-                <span className="pulse-dot"></span> Live SharePoint Synced
-              </span>
+              {isVerifying ? (
+                <span className="live-sharepoint-badge verifying" title="Active verification with SharePoint Online">
+                  <span className="pulse-dot-amber"></span> Verifying Live SharePoint...
+                </span>
+              ) : (
+                <span className="live-sharepoint-badge" title="Showing only entries present and verified in SharePoint Online">
+                  <span className="pulse-dot"></span> Live SharePoint Synced
+                </span>
+              )}
             </div>
             <p className="entries-subtitle">
               Sheet: <strong>{targetSheet}</strong> • Showing {filteredEntries.length} of {entries.length} verified rows from SharePoint
@@ -83,30 +110,98 @@ export default function RecentEntriesTable({
             <span>My Entries Only</span>
           </button>
 
-          {/* Sync SharePoint Button */}
+          {/* Sync SharePoint Button - Decent, elegant, NO SPINNING */}
           <button 
             id="refresh-entries-btn"
             type="button"
-            className={`sync-sharepoint-btn ${isLoading ? 'spinning' : ''}`}
+            className={`sync-sharepoint-btn ${isVerifying ? 'is-verifying' : isLoading ? 'is-syncing' : ''}`}
             onClick={() => onRefresh && onRefresh(true)}
+            disabled={isLoading || isVerifying}
             title="Pull latest confirmed entries directly from SharePoint Online"
           >
-            <RefreshCw size={14} className={`sync-icon ${isLoading ? 'spinning' : ''}`} />
-            <span>{isLoading ? 'Syncing...' : 'Sync SharePoint'}</span>
+            <span className={`sync-status-indicator ${isVerifying ? 'verifying' : isLoading ? 'syncing' : 'ready'}`}></span>
+            <Cloud size={14} className="sync-cloud-icon" />
+            <span>{isVerifying ? 'Verifying Cloud...' : isLoading ? 'Syncing...' : 'Sync SharePoint'}</span>
           </button>
         </div>
       </div>
 
-      {/* Entries Table */}
+      {/* Live SharePoint Cloud Sync Verification Monitor (shown from click until entries confirmed) */}
+      {isVerifying && (
+        <div className="sharepoint-sync-monitor-card animate-fade-in">
+          <div className="monitor-top-row">
+            <div className="monitor-status-badge">
+              <span className="radar-ping-ring"></span>
+              <span className="radar-core-dot"></span>
+              <Cloud size={16} className="monitor-cloud-icon" />
+              <strong>Verifying with SharePoint Online</strong>
+            </div>
+
+            <div className="monitor-timer-pill">
+              <Clock size={13} />
+              <span>Checking cloud: <strong>{verificationSeconds}s</strong> / {verificationMaxSeconds}s</span>
+            </div>
+          </div>
+
+          <div className="monitor-progress-track">
+            <div 
+              className="monitor-progress-fill" 
+              style={{ width: `${progressPercent}%` }}
+            >
+              <div className="monitor-shimmer"></div>
+            </div>
+          </div>
+
+          <div className="monitor-details-row">
+            <div className="monitor-explainer">
+              <span className="pulse-text-indicator">●</span>
+              <span>
+                Dispatched via Resend • Waiting for Power Automate flow to append {pendingEntries.length} row(s) to sheet <strong>{targetSheet}</strong>
+              </span>
+            </div>
+
+            {pendingEntries && pendingEntries.length > 0 && (
+              <div className="pending-chips-wrap">
+                {pendingEntries.map((p, idx) => (
+                  <span key={idx} className="pending-entry-chip">
+                    <span className="chip-pulsing-dot"></span>
+                    <span className="chip-name">{p.ticket ? `#${p.ticket}` : p.category}</span>
+                    <span className="chip-hrs">{p.timeInHrs}h</span>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Entries Table Area */}
       <div className="entries-table-wrapper">
-        {isLoading ? (
-          <div className="empty-state">
-            <RefreshCw size={24} className="spinning" />
-            <p>Loading entries from Excel sheet...</p>
+        {isLoading && !isVerifying ? (
+          /* Aesthetic modern loader when fetching rows without spinning icon */
+          <div className="aesthetic-sync-loader animate-fade-in">
+            <div className="aesthetic-loader-pill">
+              <span className="loader-glow-orb"></span>
+              <Cloud size={18} className="loader-cloud-icon" />
+              <span>Fetching verified entries from SharePoint Online...</span>
+            </div>
+            <div className="skeleton-table-rows">
+              <div className="skeleton-row shimmer"></div>
+              <div className="skeleton-row shimmer"></div>
+              <div className="skeleton-row shimmer"></div>
+            </div>
           </div>
         ) : filteredEntries.length === 0 ? (
           <div className="empty-state">
-            <p>No matching entries found in this sprint sheet.</p>
+            {isVerifying ? (
+              <div className="verifying-empty-note">
+                <Cloud size={32} className="cloud-waiting-icon" />
+                <p>Waiting for submitted tasks to appear in SharePoint Online...</p>
+                <span className="verifying-hint">The table will automatically refresh the moment Microsoft Power Automate finishes.</span>
+              </div>
+            ) : (
+              <p>No matching entries found in this sprint sheet.</p>
+            )}
           </div>
         ) : (
           <table className="entries-table">
@@ -127,7 +222,7 @@ export default function RecentEntriesTable({
                     <span className="date-badge">{entry.date}</span>
                   </td>
                   <td className="cell-name">
-                    <span className={`name-chip ${entry.name.toLowerCase() === currentUser.toLowerCase() ? 'is-current-user' : ''}`}>
+                    <span className={`name-chip ${entry.name && currentUser && entry.name.toLowerCase() === currentUser.toLowerCase() ? 'is-current-user' : ''}`}>
                       {entry.name}
                     </span>
                   </td>

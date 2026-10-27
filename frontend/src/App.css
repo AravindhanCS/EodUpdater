@@ -7760,7 +7760,691 @@
   }
 }
 
+/* ==========================================================================
+   SHAREPOINT LIVE SYNC, VERIFICATION MONITOR & NON-SPINNING BUTTON STYLES
+   ========================================================================== */
 
+/* 1. Decent, Executive Non-Spinning Sync SharePoint Button */
+.sync-sharepoint-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  background: rgba(30, 41, 59, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-main);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  backdrop-filter: blur(8px);
+  user-select: none;
+}
 
+.sync-sharepoint-btn:hover:not(:disabled) {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.4);
+  color: #93c5fd;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+}
 
+.sync-sharepoint-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.85;
+}
+
+.sync-sharepoint-btn.is-syncing {
+  background: rgba(6, 182, 212, 0.12);
+  border-color: rgba(6, 182, 212, 0.35);
+  color: #67e8f9;
+}
+
+.sync-sharepoint-btn.is-verifying {
+  background: rgba(139, 92, 246, 0.14);
+  border-color: rgba(139, 92, 246, 0.4);
+  color: #c4b5fd;
+  box-shadow: 0 0 16px rgba(139, 92, 246, 0.2);
+}
+
+/* Status Indicator Dot (Subtle glowing pulse, zero spinning) */
+.sync-status-indicator {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+  transition: all 0.3s ease;
+}
+
+.sync-status-indicator.ready {
+  background: #10b981;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+}
+
+.sync-status-indicator.syncing {
+  background: #06b6d4;
+  box-shadow: 0 0 10px rgba(6, 182, 212, 0.7);
+  animation: calmBreath 1.8s ease-in-out infinite;
+}
+
+.sync-status-indicator.verifying {
+  background: #a855f7;
+  box-shadow: 0 0 12px rgba(168, 85, 247, 0.8);
+  animation: calmBreath 1.4s ease-in-out infinite;
+}
+
+.sync-cloud-icon {
+  color: currentColor;
+  opacity: 0.9;
+}
+
+@keyframes calmBreath {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1.35);
+    opacity: 1;
+  }
+}
+
+/* 2. Live SharePoint Badge in Header */
+.live-sharepoint-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #34d399;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.live-sharepoint-badge.verifying {
+  background: rgba(245, 158, 11, 0.14);
+  border-color: rgba(245, 158, 11, 0.35);
+  color: #fbbf24;
+}
+
+.pulse-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 6px #10b981;
+  animation: calmBreath 2s infinite ease-in-out;
+}
+
+.pulse-dot-amber {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #f59e0b;
+  box-shadow: 0 0 8px #f59e0b;
+  animation: calmBreath 1.2s infinite ease-in-out;
+}
+
+/* 3. SharePoint Live Cloud Sync Verification Monitor Card */
+.sharepoint-sync-monitor-card {
+  margin-top: 4px;
+  padding: 16px 20px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, rgba(30, 27, 75, 0.55) 0%, rgba(15, 23, 42, 0.8) 100%);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  box-shadow: 0 8px 32px rgba(139, 92, 246, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  backdrop-filter: blur(12px);
+}
+
+.monitor-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.monitor-status-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+  font-size: 0.92rem;
+  color: #e0e7ff;
+}
+
+.radar-ping-ring {
+  position: absolute;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid #8b5cf6;
+  opacity: 0.8;
+  animation: radarPing 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+.radar-core-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #a855f7;
+  box-shadow: 0 0 10px #a855f7;
+}
+
+.monitor-cloud-icon {
+  color: #a78bfa;
+}
+
+@keyframes radarPing {
+  75%, 100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
+.monitor-timer-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 0.76rem;
+  color: #cbd5e1;
+  font-family: var(--font-mono);
+}
+
+.monitor-timer-pill strong {
+  color: #facc15;
+}
+
+/* Progress track and animated gradient shimmer */
+.monitor-progress-track {
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+  position: relative;
+}
+
+.monitor-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 50%, #ec4899 100%);
+  position: relative;
+  transition: width 0.8s ease;
+}
+
+.monitor-shimmer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.45) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  animation: monitorShimmerAnim 2s infinite linear;
+}
+
+@keyframes monitorShimmerAnim {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.monitor-details-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.monitor-explainer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: #94a3b8;
+}
+
+.pulse-text-indicator {
+  color: #a855f7;
+  font-size: 0.7rem;
+  animation: calmBreath 1.2s infinite ease-in-out;
+}
+
+.pending-chips-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.pending-entry-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(139, 92, 246, 0.15);
+  border: 1px solid rgba(139, 92, 246, 0.35);
+  font-size: 0.72rem;
+  color: #ddd6fe;
+}
+
+.chip-pulsing-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #c084fc;
+  box-shadow: 0 0 6px #c084fc;
+  animation: calmBreath 1.4s infinite ease-in-out;
+}
+
+.chip-name {
+  font-weight: 600;
+}
+
+.chip-hrs {
+  font-family: var(--font-mono);
+  color: #34d399;
+  font-weight: 700;
+}
+
+/* 4. Aesthetic Modern Loader (No spinning wheels) */
+.aesthetic-sync-loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  gap: 20px;
+  width: 100%;
+}
+
+.aesthetic-loader-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 20px;
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  color: #93c5fd;
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.loader-glow-orb {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #3b82f6;
+  box-shadow: 0 0 12px #3b82f6;
+  animation: calmBreath 1.5s infinite ease-in-out;
+}
+
+.loader-cloud-icon {
+  color: #60a5fa;
+}
+
+.skeleton-table-rows {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 640px;
+}
+
+.skeleton-row {
+  height: 38px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.04);
+  position: relative;
+  overflow: hidden;
+}
+
+.skeleton-row.shimmer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.08) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  animation: monitorShimmerAnim 1.8s infinite linear;
+}
+
+.verifying-empty-note {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+  padding: 32px 16px;
+  color: #cbd5e1;
+}
+
+.cloud-waiting-icon {
+  color: #8b5cf6;
+  opacity: 0.8;
+  animation: calmBreath 2s infinite ease-in-out;
+}
+
+.verifying-hint {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  max-width: 420px;
+}
+
+/* 5. SyncStatusModal Styles */
+.sync-status-modal {
+  max-width: 620px !important;
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5), 0 0 32px rgba(139, 92, 246, 0.15);
+}
+
+.sync-header {
+  padding: 20px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sync-header.success-header {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(15, 23, 42, 0.4) 100%);
+  border-bottom: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.sync-header.warning-header {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.14) 0%, rgba(15, 23, 42, 0.4) 100%);
+  border-bottom: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+.sync-icon-badge {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.sync-icon-badge.success {
+  background: rgba(16, 185, 129, 0.18);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  box-shadow: 0 0 16px rgba(16, 185, 129, 0.2);
+}
+
+.sync-icon-badge.warning {
+  background: rgba(245, 158, 11, 0.18);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  box-shadow: 0 0 16px rgba(245, 158, 11, 0.2);
+}
+
+.sync-modal-body {
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.sync-metric-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-radius: var(--radius-md);
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  font-size: 0.82rem;
+  color: #a7f3d0;
+}
+
+.verified-items-table-wrap {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.verified-items-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.verified-items-table th {
+  background: rgba(15, 23, 42, 0.6);
+  padding: 8px 12px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  text-align: left;
+}
+
+.verified-items-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.sync-notice-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  font-size: 0.8rem;
+}
+
+.sync-notice-banner.success {
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  color: #cbd5e1;
+}
+
+.sync-notice-banner .banner-icon {
+  color: #10b981;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.sync-notice-banner p {
+  margin-top: 2px;
+  color: var(--text-muted);
+}
+
+/* Timeout Notice Styles */
+.timeout-notice-box {
+  padding: 14px 18px;
+  border-radius: var(--radius-md);
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+.timeout-notice-box h4 {
+  font-size: 0.9rem;
+  color: #fbbf24;
+  margin-bottom: 6px;
+}
+
+.timeout-notice-box p {
+  font-size: 0.82rem;
+  color: #cbd5e1;
+  line-height: 1.5;
+}
+
+.timeout-steps-card {
+  padding: 14px 18px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.timeout-steps-card h5 {
+  font-size: 0.84rem;
+  color: #93c5fd;
+  margin-bottom: 8px;
+}
+
+.timeout-steps-card ul {
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.pending-entries-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 0.8rem;
+}
+
+.pending-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.pending-chip {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 0.74rem;
+  color: #cbd5e1;
+}
+
+.sync-modal-footer {
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(15, 23, 42, 0.4);
+}
+
+/* Light Theme Overrides */
+[data-theme="light"] .sync-sharepoint-btn {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #334155;
+}
+
+[data-theme="light"] .sync-sharepoint-btn:hover:not(:disabled) {
+  background: #eff6ff;
+  border-color: #3b82f6;
+  color: #1d4ed8;
+}
+
+[data-theme="light"] .sharepoint-sync-monitor-card {
+  background: linear-gradient(135deg, #f5f3ff 0%, #ffffff 100%);
+  border-color: #ddd6fe;
+  box-shadow: 0 8px 24px rgba(139, 92, 246, 0.08);
+}
+
+[data-theme="light"] .monitor-status-badge {
+  color: #312e81;
+}
+
+[data-theme="light"] .monitor-timer-pill {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #475569;
+}
+
+[data-theme="light"] .monitor-timer-pill strong {
+  color: #b45309;
+}
+
+[data-theme="light"] .monitor-progress-track {
+  background: #e2e8f0;
+}
+
+[data-theme="light"] .monitor-explainer {
+  color: #64748b;
+}
+
+[data-theme="light"] .pending-entry-chip {
+  background: #ede9fe;
+  border-color: #c4b5fd;
+  color: #5b21b6;
+}
+
+[data-theme="light"] .aesthetic-loader-pill {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1d4ed8;
+}
+
+[data-theme="light"] .skeleton-row {
+  background: #f1f5f9;
+}
+
+[data-theme="light"] .sync-status-modal {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.15);
+}
+
+[data-theme="light"] .sync-header.success-header {
+  background: #ecfdf5;
+  border-bottom-color: #a7f3d0;
+}
+
+[data-theme="light"] .sync-header.warning-header {
+  background: #fffbeb;
+  border-bottom-color: #fde68a;
+}
+
+[data-theme="light"] .verified-items-table th {
+  background: #f8fafc;
+  border-bottom-color: #e2e8f0;
+}
+
+[data-theme="light"] .verified-items-table td {
+  border-bottom-color: #f1f5f9;
+}
+
+[data-theme="light"] .timeout-steps-card {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .sync-modal-footer {
+  background: #f8fafc;
+  border-top-color: #e2e8f0;
+}
 

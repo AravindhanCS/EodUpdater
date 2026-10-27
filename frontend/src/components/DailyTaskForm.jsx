@@ -247,14 +247,15 @@ export default function DailyTaskForm({
     e.preventDefault();
     if (totalHours <= 0) return;
 
-    // Format entries for API
+    // Format entries for API, stripping any accidental newlines
+    const cleanStr = (s) => (s ? s.replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim() : '');
     const entries = rows.map(r => ({
       date: selectedDate,
-      name: currentUser,
-      ticket: r.ticket ? r.ticket.trim() : '',
-      category: r.category || 'Development',
+      name: cleanStr(currentUser),
+      ticket: cleanStr(r.ticket),
+      category: cleanStr(r.category || 'Development'),
       timeInHrs: parseFloat(r.timeInHrs) || 0,
-      description: r.description ? r.description.trim() : 'General tasks'
+      description: cleanStr(r.description) || 'General tasks'
     }));
 
     onSubmit({

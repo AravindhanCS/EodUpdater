@@ -242,9 +242,9 @@ public class ExcelService {
                     }
                 }
 
-                String name = formatter.formatCellValue(row.getCell(1));
-                String ticket = formatter.formatCellValue(row.getCell(2));
-                String category = formatter.formatCellValue(row.getCell(3));
+                String name = formatter.formatCellValue(row.getCell(1)).replaceAll("[\\r\\n]+", " ").trim();
+                String ticket = formatter.formatCellValue(row.getCell(2)).replaceAll("[\\r\\n]+", " ").trim();
+                String category = formatter.formatCellValue(row.getCell(3)).replaceAll("[\\r\\n]+", " ").trim();
 
                 double hrs = 0.0;
                 Cell hrsCell = row.getCell(4);
@@ -258,7 +258,7 @@ public class ExcelService {
                     }
                 }
 
-                String desc = formatter.formatCellValue(row.getCell(5));
+                String desc = formatter.formatCellValue(row.getCell(5)).replaceAll("[\\r\\n]+", " ").trim();
 
                 if (!name.isEmpty() || !desc.isEmpty()) {
                     entries.add(new EodEntry(dateStr, name, ticket, category, hrs, desc));
@@ -319,17 +319,17 @@ public class ExcelService {
 
                 // Col 1: Name
                 Cell c1 = row.createCell(1, CellType.STRING);
-                c1.setCellValue(entry.getName() != null ? entry.getName().trim() : "");
+                c1.setCellValue(cleanCellStr(entry.getName()));
                 c1.setCellStyle(textStyle);
 
                 // Col 2: Ticket
                 Cell c2 = row.createCell(2, CellType.STRING);
-                c2.setCellValue(entry.getTicket() != null ? entry.getTicket().trim() : "");
+                c2.setCellValue(cleanCellStr(entry.getTicket()));
                 c2.setCellStyle(textStyle);
 
                 // Col 3: Category
                 Cell c3 = row.createCell(3, CellType.STRING);
-                c3.setCellValue(entry.getCategory() != null ? entry.getCategory().trim() : "");
+                c3.setCellValue(cleanCellStr(entry.getCategory()));
                 c3.setCellStyle(textStyle);
 
                 // Col 4: Time (in hrs)
@@ -341,7 +341,7 @@ public class ExcelService {
 
                 // Col 5: Description
                 Cell c5 = row.createCell(5, CellType.STRING);
-                c5.setCellValue(entry.getDescription() != null ? entry.getDescription().trim() : "");
+                c5.setCellValue(cleanCellStr(entry.getDescription()));
                 c5.setCellStyle(textStyle);
 
                 rowsAdded++;
@@ -696,15 +696,15 @@ public class ExcelService {
                 c0.setCellStyle(dateStyle);
 
                 Cell c1 = row.createCell(1, CellType.STRING);
-                c1.setCellValue(entry.getName() != null ? entry.getName().trim() : "");
+                c1.setCellValue(cleanCellStr(entry.getName()));
                 c1.setCellStyle(textStyle);
 
                 Cell c2 = row.createCell(2, CellType.STRING);
-                c2.setCellValue(entry.getTicket() != null ? entry.getTicket().trim() : "");
+                c2.setCellValue(cleanCellStr(entry.getTicket()));
                 c2.setCellStyle(textStyle);
 
                 Cell c3 = row.createCell(3, CellType.STRING);
-                c3.setCellValue(entry.getCategory() != null ? entry.getCategory().trim() : "");
+                c3.setCellValue(cleanCellStr(entry.getCategory()));
                 c3.setCellStyle(textStyle);
 
                 Cell c4 = row.createCell(4, CellType.NUMERIC);
@@ -712,13 +712,18 @@ public class ExcelService {
                 c4.setCellStyle(numStyle);
 
                 Cell c5 = row.createCell(5, CellType.STRING);
-                c5.setCellValue(entry.getDescription() != null ? entry.getDescription().trim() : "");
+                c5.setCellValue(cleanCellStr(entry.getDescription()));
                 c5.setCellStyle(textStyle);
             }
 
             workbook.write(baos);
             return baos.toByteArray();
         }
+    }
+
+    private static String cleanCellStr(String s) {
+        if (s == null) return "";
+        return s.replaceAll("[\\r\\n]+", " ").replaceAll("\\s+", " ").trim();
     }
 
     private Sheet createSprintSheet(Workbook workbook, String sheetName) {
