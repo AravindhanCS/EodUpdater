@@ -612,68 +612,251 @@
   font-weight: 700;
 }
 
+.hours-metric-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.metric-title {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.hours-logged-value {
+  font-size: 1.25rem;
+  font-family: var(--font-mono);
+  color: var(--text-main);
+  font-weight: 700;
+}
+
 .hours-logged-value.goal-reached {
   color: #34d399;
 }
 
-.hours-divider {
-  color: var(--text-dim);
+.metric-unit {
+  font-size: 0.82rem;
   font-weight: 600;
-  margin: 0 1px;
+  color: var(--text-muted);
 }
 
-.target-hours-control {
+.metric-target-divider {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  margin: 0 2px;
+}
+
+.metric-target-value {
+  font-size: 0.95rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+
+/* Target Hours Control Center */
+.target-control-hub {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+  margin: 4px 0;
+  flex-wrap: wrap;
+}
+
+.target-hub-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.target-hub-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.target-hub-icon {
+  color: #3b82f6;
+}
+
+.target-preset-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.target-preset-chip {
+  padding: 4px 9px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.target-preset-chip:hover {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  border-color: rgba(59, 130, 246, 0.4);
+  transform: translateY(-1px);
+}
+
+.target-preset-chip.active {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: #ffffff;
+  border-color: #3b82f6;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
+}
+
+.target-stepper-capsule {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1.5px dashed rgba(255, 255, 255, 0.22);
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
-  padding: 2px 7px;
-  transition: all 0.2s ease;
-  cursor: pointer;
+  padding: 3px 5px;
+  gap: 4px;
 }
 
-.target-hours-control:hover,
-.target-hours-control:focus-within {
-  background: rgba(59, 130, 246, 0.15);
-  border-color: #60a5fa;
-  border-style: solid;
-}
-
-.target-hours-input {
-  width: 38px;
-  padding: 1px 0;
-  border: none;
-  background: transparent;
+.stepper-step-btn {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
   color: var(--text-main);
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.stepper-step-btn:hover {
+  background: rgba(59, 130, 246, 0.25);
+  color: #60a5fa;
+  border-color: #60a5fa;
+}
+
+.stepper-display-val {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.82rem;
+  font-weight: 700;
   font-family: var(--font-mono);
-  font-size: 1.05rem;
+  color: var(--text-main);
+  padding: 2px 6px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.15s ease;
+}
+
+.stepper-display-val:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #60a5fa;
+}
+
+.stepper-edit-icon {
+  color: var(--text-dim);
+  opacity: 0.6;
+}
+
+.stepper-custom-input {
+  width: 52px;
+  padding: 2px 4px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid #3b82f6;
+  border-radius: 4px;
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
   font-weight: 700;
   text-align: center;
   outline: none;
 }
 
-.target-hours-input::-webkit-inner-spin-button,
-.target-hours-input::-webkit-outer-spin-button {
-  opacity: 0.6;
+/* Live SharePoint Sync Header Elements */
+.entries-title-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
-.target-hours-unit {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--text-muted);
+.live-sharepoint-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #34d399;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  letter-spacing: 0.3px;
 }
 
-.target-edit-hint {
-  color: var(--text-dim);
-  opacity: 0.6;
-  transition: opacity 0.2s ease;
+.pulse-dot {
+  width: 6px;
+  height: 6px;
+  background: #10b981;
+  border-radius: 50%;
+  box-shadow: 0 0 6px #10b981;
+  animation: pulse-green 2s infinite ease-in-out;
 }
 
-.target-hours-control:hover .target-edit-hint {
+@keyframes pulse-green {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(0.85);
+  }
+}
+
+.sync-sharepoint-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: rgba(59, 130, 246, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: var(--radius-sm);
   color: #60a5fa;
-  opacity: 1;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.sync-sharepoint-btn:hover {
+  background: rgba(59, 130, 246, 0.25);
+  border-color: #60a5fa;
+  color: #ffffff;
 }
 
 .hours-badge {
@@ -6331,32 +6514,77 @@
   color: #94a3b8 !important;
 }
 
-[data-theme="light"] .target-hours-control {
-  background: #f1f5f9 !important;
-  border: 1.5px dashed #94a3b8 !important;
+[data-theme="light"] .target-control-hub {
+  background: #f8fafc !important;
+  border-color: #e2e8f0 !important;
 }
 
-[data-theme="light"] .target-hours-control:hover,
-[data-theme="light"] .target-hours-control:focus-within {
-  background: #eff6ff !important;
-  border-color: #2563eb !important;
-  border-style: solid !important;
-}
-
-[data-theme="light"] .target-hours-input {
-  color: #0f172a !important;
-}
-
-[data-theme="light"] .target-hours-unit {
-  color: #475569 !important;
-}
-
-[data-theme="light"] .target-edit-hint {
+[data-theme="light"] .target-hub-label {
   color: #64748b !important;
 }
 
-[data-theme="light"] .target-hours-control:hover .target-edit-hint {
-  color: #2563eb !important;
+[data-theme="light"] .target-preset-chip {
+  background: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #475569 !important;
+}
+
+[data-theme="light"] .target-preset-chip:hover {
+  background: #eff6ff !important;
+  color: #1d4ed8 !important;
+  border-color: #93c5fd !important;
+}
+
+[data-theme="light"] .target-preset-chip.active {
+  background: #2563eb !important;
+  color: #ffffff !important;
+  border-color: #1d4ed8 !important;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25) !important;
+}
+
+[data-theme="light"] .target-stepper-capsule {
+  background: #ffffff !important;
+  border-color: #cbd5e1 !important;
+}
+
+[data-theme="light"] .stepper-step-btn {
+  background: #f1f5f9 !important;
+  color: #1e293b !important;
+  border-color: #cbd5e1 !important;
+}
+
+[data-theme="light"] .stepper-step-btn:hover {
+  background: #eff6ff !important;
+  color: #1d4ed8 !important;
+  border-color: #3b82f6 !important;
+}
+
+[data-theme="light"] .stepper-display-val {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .stepper-custom-input {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #2563eb !important;
+}
+
+[data-theme="light"] .live-sharepoint-badge {
+  background: #ecfdf5 !important;
+  border-color: #a7f3d0 !important;
+  color: #059669 !important;
+}
+
+[data-theme="light"] .sync-sharepoint-btn {
+  background: #eff6ff !important;
+  border-color: #bfdbfe !important;
+  color: #1d4ed8 !important;
+}
+
+[data-theme="light"] .sync-sharepoint-btn:hover {
+  background: #dbeafe !important;
+  color: #1e40af !important;
+  border-color: #3b82f6 !important;
 }
 
 [data-theme="light"] .hours-badge.badge-success {

@@ -26,6 +26,26 @@ import {
   uploadAndProcessFile 
 } from './services/api';
 
+function detectLatestSprint(sheets, fallback = '2.14.11.0') {
+  if (!sheets || sheets.length === 0) return fallback;
+  const pattern = /^(\d+)\.(\d+)\.(\d+)\.(\d+)/;
+  const list = sheets
+    .map(s => typeof s === 'string' ? s : s.name)
+    .filter(n => pattern.test(n));
+  if (list.length === 0) return fallback;
+  list.sort((a, b) => {
+    const ma = a.match(pattern);
+    const mb = b.match(pattern);
+    for (let i = 1; i <= 4; i++) {
+      const va = parseInt(ma[i], 10);
+      const vb = parseInt(mb[i], 10);
+      if (va !== vb) return vb - va; // descending: newest first
+    }
+    return b.localeCompare(a);
+  });
+  return list[0];
+}
+
 export default function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem('eod_theme') || 'dark');
   const [activeTab, setActiveTab] = useState('logger'); // 'logger' | 'dashboard'
@@ -34,8 +54,8 @@ export default function App() {
   const [isDragActive, setIsDragActive] = useState(false);
 
   const [status, setStatus] = useState(null);
-  const [activeSprint, setActiveSprint] = useState('2.14.10.1');
-  const [targetSheet, setTargetSheet] = useState('2.14.10.1');
+  const [activeSprint, setActiveSprint] = useState('2.14.11.0');
+  const [targetSheet, setTargetSheet] = useState('2.14.11.0');
   const [teamMembers, setTeamMembers] = useState(['Aravindhan', 'Akshaya', 'Arun', 'Kriti', 'Abinaya', 'Uma']);
   const [categories, setCategories] = useState(['Development', 'QA', 'Internal calls', 'Client calls', 'Dev chat issue', 'PR comments', 'N/A']);
   const [currentUser, setCurrentUser] = useState(() => localStorage.getItem('eod_user') || 'Aravindhan');
@@ -68,25 +88,26 @@ export default function App() {
     try {
       const data = await fetchStatus(customPath);
       setStatus(data);
-      if (data.activeSprintName) {
-        setActiveSprint(data.activeSprintName);
-        setTargetSheet(data.activeSprintName);
+      const detectedSprint = data.activeSprintName || detectLatestSprint(data.sheets);
+      if (detectedSprint) {
+        setActiveSprint(detectedSprint);
+        setTargetSheet(detectedSprint);
       }
       if (data.teamMembers?.length) setTeamMembers(data.teamMembers);
       if (data.categories?.length) setCategories(data.categories);
       if (data.currentUser && !localStorage.getItem('eod_user')) {
         setCurrentUser(data.currentUser);
       }
-      loadRecentEntries(data.activeSprintName || targetSheet, customPath);
+      loadRecentEntries(detectedSprint || targetSheet, customPath);
     } catch (e) {
       showToast('Could not connect to Spring Boot backend. Please ensure server is running.', 'error');
     }
   };
 
-  const loadRecentEntries = async (sheet, path = '') => {
+  const loadRecentEntries = async (sheet, path = '', forceRefresh = false) => {
     setIsLoadingEntries(true);
     try {
-      const entries = await fetchRecentEntries(sheet, path, 40);
+      const entries = await fetchRecentEntries(sheet, path, 40, forceRefresh);
       setRecentEntries(entries);
     } catch (e) {
       console.warn('Could not load recent entries:', e);
@@ -140,14 +161,19 @@ export default function App() {
         triggerCelebration();
         if (res.sharePointSynced) {
           showToast(
-            `Successfully added ${res.rowsAdded} task(s) totaling ${res.totalHoursAdded}h to SharePoint Online and local copy!`,
+            res.message || `Dispatched ${res.rowsAdded} task(s) totaling ${res.totalHoursAdded}h to SharePoint Online via Cloud Automation!`,
             'success'
           );
+          // Auto-sync after Power Automate has processed in the cloud
+          setTimeout(() => {
+            loadRecentEntries(sheetName, status?.configuredFilePath, true);
+          }, 10000);
         } else {
           showToast(
             res.message || `Saved to local file (${res.rowsAdded} task(s)), but SharePoint sync was skipped.`,
             'warning'
           );
+          loadRecentEntries(sheetName, status?.configuredFilePath, false);
         }
         loadAppStatus();
       } else {
@@ -291,7 +317,7 @@ export default function App() {
                 currentUser={currentUser}
                 targetSheet={targetSheet}
                 isLoading={isLoadingEntries}
-                onRefresh={() => loadRecentEntries(targetSheet)}
+                onRefresh={(force) => loadRecentEntries(targetSheet, status?.configuredFilePath, force ?? true)}
               />
             </section>
           </>

@@ -15,11 +15,12 @@ export async function fetchSheets(path = '') {
   return res.json();
 }
 
-export async function fetchRecentEntries(sheetName = '', path = '', limit = 30) {
+export async function fetchRecentEntries(sheetName = '', path = '', limit = 30, refresh = false) {
   const params = new URLSearchParams();
   if (path) params.append('path', path);
   if (sheetName) params.append('sheetName', sheetName);
   params.append('limit', limit);
+  if (refresh) params.append('refresh', 'true');
 
   const res = await fetch(`${API_BASE}/recent-entries?${params.toString()}`);
   if (!res.ok) throw new Error(`Fetching recent entries failed: ${res.statusText}`);

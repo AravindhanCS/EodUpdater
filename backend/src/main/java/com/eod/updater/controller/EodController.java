@@ -103,9 +103,20 @@ public class EodController {
         );
 
         try {
-            resp.setSheets(excelService.getSheets(effectivePath));
+            List<SheetInfo> sheets = excelService.getSheets(effectivePath);
+            resp.setSheets(sheets);
             resp.setTeamMembers(excelService.getTeamMembers(effectivePath));
             resp.setCategories(excelService.getCategories(effectivePath));
+
+            String latestSprint = sheets.stream()
+                    .filter(SheetInfo::isActiveSprint)
+                    .map(SheetInfo::getName)
+                    .findFirst()
+                    .orElseGet(() -> {
+                        List<String> names = sheets.stream().map(SheetInfo::getName).collect(java.util.stream.Collectors.toList());
+                        return sprintService.detectLatestSprintSheet(names, sprintService.getCurrentSprintName());
+                    });
+            resp.setActiveSprintName(latestSprint);
         } catch (Exception e) {
             resp.setSheets(Collections.emptyList());
             resp.setTeamMembers(Arrays.asList("Aravindhan", "Akshaya", "Arun", "Kriti", "Abinaya", "Uma"));
@@ -125,9 +136,10 @@ public class EodController {
     public ResponseEntity<List<EodEntry>> getRecentEntries(
             @RequestParam(required = false) String path,
             @RequestParam(required = false) String sheetName,
-            @RequestParam(defaultValue = "30") int limit) throws IOException {
+            @RequestParam(defaultValue = "30") int limit,
+            @RequestParam(defaultValue = "false") boolean refresh) throws IOException {
         String effectivePath = resolveEffectivePath(path);
-        return ResponseEntity.ok(excelService.getRecentEntries(effectivePath, sheetName, limit));
+        return ResponseEntity.ok(excelService.getRecentEntries(effectivePath, sheetName, limit, refresh));
     }
 
     @GetMapping("/analytics")

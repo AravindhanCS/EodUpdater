@@ -53,6 +53,9 @@ public class ExcelService {
     private static final String REASONS_FILE = "missing_log_reasons.json";
     private final Map<String, Map<String, String>> missingLogReasons = new java.util.concurrent.ConcurrentHashMap<>();
 
+    private volatile long lastSharePointPullTime = 0;
+    private static final long SHAREPOINT_PULL_INTERVAL_MS = 20000; // 20 seconds cache to keep UI responsive
+
     public ExcelService(SprintCalculationService sprintService, ObjectMapper objectMapper, ResendEmailSyncService resendService) {
         this.sprintService = sprintService;
         this.objectMapper = objectMapper;
@@ -73,16 +76,22 @@ public class ExcelService {
             return Collections.emptyList();
         }
 
-        String currentSprint = sprintService.getCurrentSprintName();
         List<SheetInfo> list = new ArrayList<>();
+        List<String> sheetNames = new ArrayList<>();
 
         try (FileInputStream fis = new FileInputStream(file);
              Workbook workbook = WorkbookFactory.create(fis)) {
             for (int i = 0; i < workbook.getNumberOfSheets(); i++) {
+                sheetNames.add(workbook.getSheetAt(i).getSheetName());
+            }
+
+            String activeSprint = sprintService.detectLatestSprintSheet(sheetNames, sprintService.getCurrentSprintName());
+
+            for (int i = 0; i < workbook.getNumberOfSheets(); i++) {
                 Sheet sheet = workbook.getSheetAt(i);
                 String name = sheet.getSheetName();
                 int rowCount = sheet.getPhysicalNumberOfRows();
-                boolean isActive = name.equalsIgnoreCase(currentSprint);
+                boolean isActive = name.equalsIgnoreCase(activeSprint);
                 list.add(new SheetInfo(name, rowCount, isActive));
             }
         }
@@ -152,6 +161,24 @@ public class ExcelService {
     }
 
     public List<EodEntry> getRecentEntries(String filePath, String sheetName, int limit) throws IOException {
+        return getRecentEntries(filePath, sheetName, limit, false);
+    }
+
+    public List<EodEntry> getRecentEntries(String filePath, String sheetName, int limit, boolean forceRefresh) throws IOException {
+        // If sharePointUrl is configured, ensure local file is kept strictly in sync with SharePoint Online!
+        if (sharePointUrl != null && !sharePointUrl.isBlank()) {
+            boolean shouldPull = forceRefresh || (System.currentTimeMillis() - lastSharePointPullTime > SHAREPOINT_PULL_INTERVAL_MS);
+            if (shouldPull) {
+                try {
+                    log.info("Auto-syncing Recent Entries directly from live SharePoint Online (forceRefresh={})...", forceRefresh);
+                    pullLatestFromSharePoint(filePath);
+                    lastSharePointPullTime = System.currentTimeMillis();
+                } catch (Exception e) {
+                    log.warn("Failed to auto-sync from SharePoint before reading recent entries: {}", e.getMessage());
+                }
+            }
+        }
+
         File file = new File(filePath);
         if (!file.exists()) {
             return Collections.emptyList();
@@ -160,10 +187,17 @@ public class ExcelService {
         List<EodEntry> entries = new ArrayList<>();
         try (FileInputStream fis = new FileInputStream(file);
              Workbook workbook = WorkbookFactory.create(fis)) {
-            Sheet sheet = (sheetName != null && !sheetName.isBlank())
-                    ? workbook.getSheet(sheetName)
-                    : workbook.getSheet(sprintService.getCurrentSprintName());
 
+            String effectiveSheet = sheetName;
+            if (effectiveSheet == null || effectiveSheet.isBlank()) {
+                List<String> sheetNames = new ArrayList<>();
+                for (int i = 0; i < workbook.getNumberOfSheets(); i++) {
+                    sheetNames.add(workbook.getSheetName(i));
+                }
+                effectiveSheet = sprintService.detectLatestSprintSheet(sheetNames, sprintService.getCurrentSprintName());
+            }
+
+            Sheet sheet = workbook.getSheet(effectiveSheet);
             if (sheet == null && workbook.getNumberOfSheets() > 0) {
                 sheet = workbook.getSheetAt(workbook.getNumberOfSheets() - 1);
             }
@@ -307,55 +341,64 @@ public class ExcelService {
             }
         }
 
+        boolean isCloudAutomation = (resendService != null && resendService.isConfigured())
+                || (powerAutomateWebhookUrl != null && !powerAutomateWebhookUrl.isBlank());
+
         boolean localUpdated = false;
-        try {
-            Files.write(file.toPath(), updatedBytes, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-            localUpdated = true;
-        } catch (Exception e) {
-            log.warn("Local file is locked (e.g. open in WPS Office / Excel): {}", e.getMessage());
-        }
-
         boolean sharePointSynced = false;
-        String message = localUpdated
-                ? "Successfully updated local file"
-                : "Local file is currently open in Excel/WPS";
+        String message = "";
 
-        // 1. First priority: Cloud Email Sync via Resend (Triggers Power Automate in the cloud without needing local PC)
-        if (resendService != null && resendService.isConfigured()) {
-            try {
-                log.info("Dispatching EOD update email via Resend to {} for sheet {}", resendService.getToEmail(), targetSheetName);
-                resendService.sendEodUpdateEmail(targetSheetName, entries);
-                sharePointSynced = true;
-                message = "Successfully dispatched to SharePoint Online via Cloud Email Automation" + (localUpdated ? " and local copy!" : "!");
-            } catch (Exception e) {
-                log.error("Failed to dispatch email via Resend: {}", e.getMessage(), e);
-                message += " (Note: Resend email dispatch failed: " + e.getMessage() + ")";
+        if (isCloudAutomation) {
+            // Cloud automation is active: SharePoint Online is the single source of truth!
+            // We do NOT write unconfirmed/speculative rows to the local file so that
+            // 'Recent sprint entries' will strictly show ONLY rows that actually exist in SharePoint.
+            if (resendService != null && resendService.isConfigured()) {
+                try {
+                    log.info("Dispatching EOD update email via Resend to {} for sheet {}", resendService.getToEmail(), targetSheetName);
+                    resendService.sendEodUpdateEmail(targetSheetName, entries);
+                    sharePointSynced = true;
+                    message = "Successfully dispatched to SharePoint Online via Cloud Email Automation! Entries will sync once confirmed in SharePoint.";
+                } catch (Exception e) {
+                    log.error("Failed to dispatch email via Resend: {}", e.getMessage(), e);
+                    message = "Resend email dispatch failed: " + e.getMessage();
+                }
+            } else if (powerAutomateWebhookUrl != null && !powerAutomateWebhookUrl.isBlank()) {
+                try {
+                    log.info("Triggering Power Automate cloud webhook to update SharePoint Online: {}", powerAutomateWebhookUrl);
+                    sendToPowerAutomateWebhook(powerAutomateWebhookUrl, targetSheetName, entries);
+                    sharePointSynced = true;
+                    message = "Successfully updated SharePoint Online Effort Tracker via Power Automate! Entries will sync once confirmed in SharePoint.";
+                } catch (Exception e) {
+                    log.error("Failed to sync via Power Automate webhook: {}", e.getMessage(), e);
+                    message = "Power Automate webhook sync failed: " + e.getMessage();
+                }
             }
-        } else if (powerAutomateWebhookUrl != null && !powerAutomateWebhookUrl.isBlank()) {
-            // 2. Second priority: Power Automate Webhook (Works anywhere: Cloud, Linux, Windows without desktop Excel)
+        } else {
+            // Pure local offline mode: save directly to local Excel file
             try {
-                log.info("Triggering Power Automate cloud webhook to update SharePoint Online: {}", powerAutomateWebhookUrl);
-                sendToPowerAutomateWebhook(powerAutomateWebhookUrl, targetSheetName, entries);
-                sharePointSynced = true;
-                message = "Successfully updated SharePoint Online Effort Tracker via Power Automate" + (localUpdated ? " and local copy!" : "!");
+                Files.write(file.toPath(), updatedBytes, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+                localUpdated = true;
+                message = "Successfully updated local file";
             } catch (Exception e) {
-                log.error("Failed to sync via Power Automate webhook: {}", e.getMessage(), e);
-                message += " (Note: Power Automate webhook sync failed: " + e.getMessage() + ")";
+                log.warn("Local file is locked (e.g. open in WPS Office / Excel): {}", e.getMessage());
+                message = "Local file is currently open in Excel/WPS: " + e.getMessage();
             }
-        } else if (sharePointEnabled && sharePointUrl != null && !sharePointUrl.isBlank()) {
-            // 3. Third priority: Windows COM Excel desktop automation (requires local Windows host + Office)
-            try {
-                String effectiveUrl = normalizeSharePointUrl(sharePointUrl);
-                log.info("Triggering direct cloud sync to SharePoint Online via Windows COM: {}", effectiveUrl);
-                syncToSharePoint(targetSheetName, entries);
-                sharePointSynced = true;
-                message = "Successfully updated SharePoint Online Effort Tracker" + (localUpdated ? " and local copy!" : "!");
-            } catch (UnsupportedOperationException uoe) {
-                log.warn("SharePoint sync skipped (cloud host): {}", uoe.getMessage());
-                message = "Saved to local file only. (For cloud sync from Render/Linux, configure Resend API Key in Settings)";
-            } catch (Exception e) {
-                log.error("Failed to sync directly to SharePoint: {}", e.getMessage(), e);
-                message += " (Note: SharePoint sync failed: " + e.getMessage() + ")";
+
+            if (sharePointEnabled && sharePointUrl != null && !sharePointUrl.isBlank()) {
+                // Third priority: Windows COM Excel desktop automation
+                try {
+                    String effectiveUrl = normalizeSharePointUrl(sharePointUrl);
+                    log.info("Triggering direct cloud sync to SharePoint Online via Windows COM: {}", effectiveUrl);
+                    syncToSharePoint(targetSheetName, entries);
+                    sharePointSynced = true;
+                    message = "Successfully updated SharePoint Online Effort Tracker" + (localUpdated ? " and local copy!" : "!");
+                } catch (UnsupportedOperationException uoe) {
+                    log.warn("SharePoint sync skipped (cloud host): {}", uoe.getMessage());
+                    message = "Saved to local file only. (For cloud sync, configure Resend API Key in Settings)";
+                } catch (Exception e) {
+                    log.error("Failed to sync to SharePoint via Windows COM: {}", e.getMessage(), e);
+                    message = "Updated local file, but SharePoint sync failed: " + e.getMessage();
+                }
             }
         }
 

@@ -13,7 +13,8 @@ import {
   RotateCcw,
   Zap,
   Info,
-  Edit2
+  Edit2,
+  Target
 } from 'lucide-react';
 import AdoTicketSelector from './AdoTicketSelector';
 import { fetchDaySchedule } from '../services/api';
@@ -50,6 +51,15 @@ export default function DailyTaskForm({
   });
 
   const safeTarget = typeof targetDailyHours === 'number' && targetDailyHours > 0 ? targetDailyHours : 6.0;
+  const [isEditingCustomTarget, setIsEditingCustomTarget] = useState(false);
+
+  const handleSetTarget = (newTarget) => {
+    const parsed = typeof newTarget === 'number' ? newTarget : parseFloat(newTarget);
+    const safe = (!isNaN(parsed) && parsed >= 0.5) ? Math.round(parsed * 2) / 2 : 6.0;
+    setTargetDailyHours(safe);
+    localStorage.setItem('eod_target_daily_hours', safe.toString());
+    buildRows(daySchedule, selectedTickets, safe);
+  };
 
   const [daySchedule, setDaySchedule] = useState({
     scheduledCalls: [
@@ -495,21 +505,59 @@ export default function DailyTaskForm({
       {/* Progress & Submit Bar */}
       <div className="submission-bar">
         <div className="hours-progress-block">
+          {/* Top row: Metrics & Badges */}
           <div className="hours-stats-header">
-            <span className="hours-total-label">
-              <Clock size={16} className="clock-icon" /> Daily Total:
-            </span>
-
-            <div className="hours-total-display">
+            <div className="hours-metric-card">
+              <Clock size={16} className="clock-icon" />
+              <span className="metric-title">Daily Effort:</span>
               <span className={`hours-logged-value ${isGoalReached ? 'goal-reached' : ''}`}>
-                <strong>{totalHours.toFixed(1)}</strong>
+                <strong>{totalHours.toFixed(1)}</strong> <span className="metric-unit">hrs</span>
               </span>
-              <span className="hours-divider">/</span>
-              <div className="target-hours-control" title="Click to edit daily target hours (default: 6.0 hrs)">
+              <span className="metric-target-divider">of</span>
+              <span className="metric-target-value">{safeTarget.toFixed(1)}h Goal</span>
+            </div>
+
+            <span className={`hours-badge ${isGoalReached ? 'badge-success' : 'badge-warning'}`}>
+              {badgeText}
+            </span>
+          </div>
+
+          {/* Target Hours Control Center: Presets & Stepper */}
+          <div className="target-control-hub">
+            <div className="target-hub-left">
+              <span className="target-hub-label">
+                <Target size={13} className="target-hub-icon" /> Daily Target:
+              </span>
+              <div className="target-preset-chips">
+                {[4.0, 6.0, 7.0, 8.0].map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    className={`target-preset-chip ${Math.abs(safeTarget - preset) < 0.05 ? 'active' : ''}`}
+                    onClick={() => handleSetTarget(preset)}
+                    title={`Set daily target to ${preset.toFixed(1)} hours`}
+                  >
+                    {preset === 6.0 ? '6.0h (Std)' : preset === 4.0 ? '4.0h (Half)' : `${preset.toFixed(1)}h`}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="target-stepper-capsule" title="Precision adjuster or click to edit">
+              <button 
+                type="button" 
+                className="stepper-step-btn minus" 
+                onClick={() => handleSetTarget(Math.max(0.5, safeTarget - 0.5))}
+                title="Decrease target by 0.5h"
+              >
+                −
+              </button>
+
+              {isEditingCustomTarget ? (
                 <input
                   type="number"
-                  id="target-daily-hours-input"
-                  className="target-hours-input"
+                  className="stepper-custom-input"
+                  autoFocus
                   min="0.5"
                   max="24"
                   step="0.5"
@@ -519,20 +567,37 @@ export default function DailyTaskForm({
                     setTargetDailyHours(isNaN(val) ? '' : val);
                   }}
                   onBlur={(e) => {
+                    setIsEditingCustomTarget(false);
                     const parsed = parseFloat(e.target.value);
                     const safe = (!isNaN(parsed) && parsed >= 0.5) ? Math.round(parsed * 2) / 2 : 6.0;
-                    setTargetDailyHours(safe);
-                    localStorage.setItem('eod_target_daily_hours', safe.toString());
+                    handleSetTarget(safe);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.target.blur();
+                    }
                   }}
                 />
-                <span className="target-hours-unit">hrs</span>
-                <Edit2 size={12} className="target-edit-hint" />
-              </div>
-            </div>
+              ) : (
+                <div 
+                  className="stepper-display-val"
+                  onClick={() => setIsEditingCustomTarget(true)}
+                  title="Click to type custom hours"
+                >
+                  <span>{safeTarget.toFixed(1)} hrs</span>
+                  <Edit2 size={11} className="stepper-edit-icon" />
+                </div>
+              )}
 
-            <span className={`hours-badge ${isGoalReached ? 'badge-success' : 'badge-warning'}`}>
-              {badgeText}
-            </span>
+              <button 
+                type="button" 
+                className="stepper-step-btn plus" 
+                onClick={() => handleSetTarget(Math.min(24.0, safeTarget + 0.5))}
+                title="Increase target by 0.5h"
+              >
+                +
+              </button>
+            </div>
           </div>
 
           <div className="progress-track">

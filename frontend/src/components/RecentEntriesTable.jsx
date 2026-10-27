@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { RefreshCw, Search, Filter, History, User, Tag, Calendar, Clock } from 'lucide-react';
+import { RefreshCw, Search, Filter, History, User, Tag, Calendar, Clock, CheckCircle2 } from 'lucide-react';
 
 export default function RecentEntriesTable({
   entries = [],
@@ -45,9 +45,14 @@ export default function RecentEntriesTable({
         <div className="entries-title-wrap">
           <History size={20} className="entries-icon" />
           <div>
-            <h2 className="entries-title">Recent Sprint Entries</h2>
+            <div className="entries-title-line">
+              <h2 className="entries-title">Recent Sprint Entries</h2>
+              <span className="live-sharepoint-badge" title="Showing only entries present and verified in SharePoint Online">
+                <span className="pulse-dot"></span> Live SharePoint Synced
+              </span>
+            </div>
             <p className="entries-subtitle">
-              Sheet: <strong>{targetSheet}</strong> • Showing {filteredEntries.length} of {entries.length} logged rows
+              Sheet: <strong>{targetSheet}</strong> • Showing {filteredEntries.length} of {entries.length} verified rows from SharePoint
             </p>
           </div>
         </div>
@@ -78,15 +83,16 @@ export default function RecentEntriesTable({
             <span>My Entries Only</span>
           </button>
 
-          {/* Refresh Button */}
+          {/* Sync SharePoint Button */}
           <button 
             id="refresh-entries-btn"
             type="button"
-            className={`icon-action-btn ${isLoading ? 'spinning' : ''}`}
-            onClick={onRefresh}
-            title="Refresh entries from Excel"
+            className={`sync-sharepoint-btn ${isLoading ? 'spinning' : ''}`}
+            onClick={() => onRefresh && onRefresh(true)}
+            title="Pull latest confirmed entries directly from SharePoint Online"
           >
-            <RefreshCw size={16} />
+            <RefreshCw size={14} className={`sync-icon ${isLoading ? 'spinning' : ''}`} />
+            <span>{isLoading ? 'Syncing...' : 'Sync SharePoint'}</span>
           </button>
         </div>
       </div>
